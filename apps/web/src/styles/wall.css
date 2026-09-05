@@ -77,7 +77,9 @@ input {
   color: inherit;
   background: transparent;
   cursor: pointer;
-  transform-origin: center;
+  /* matrix3d 平移携带左上角坐标（quadMatrix 按 origin: top left 推导），
+     显式居中补偿已写进运行动画路径 */
+  transform-origin: 0 0;
   contain: layout paint style;
   will-change: transform;
 }

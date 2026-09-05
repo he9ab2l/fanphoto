@@ -44,6 +44,13 @@ const damp = (from: number, to: number, rate: number, delta: number) =>
   from + (to - from) * (1 - Math.pow(1 - rate, delta))
 const smooth = (value: number) => value * value * (3 - 2 * value)
 
+/**
+ * 把位移回绕进 [0, extent)。整张墙共享同一个回绕结果：
+ * 卡片间距恒为 period，相邻卡片的晶格点严格对齐 —— 穹顶变形无缝；
+ * 越过回绕边界时整场同时平移一个坐标场宽度（落在屏外冗余区），内容逐像素一致。
+ */
+const wrapField = (value: number, extent: number) => ((value % extent) + extent) % extent
+
 export function useWallMotion({
   layout,
   stageRef,
@@ -91,6 +98,20 @@ export function useWallMotion({
     const fieldHeight = layout.rows * period
     const marginX = (layout.width - fieldWidth) / 2
     const marginY = (layout.height - fieldHeight) / 2
+    // 离屏卡片：只写一次 park 变换，之后整帧跳过，直到重新进入视野
+    const parked = new Set<HTMLElement>()
+
+    const applyTransform = (element: HTMLElement, value: string) => {
+      if (element.style.transform !== value) element.style.transform = value
+    }
+
+    const applyVisibility = (element: HTMLElement, visible: boolean) => {
+      if (element.dataset.visible === String(visible)) return
+      element.dataset.visible = String(visible)
+      const trigger = element.querySelector<HTMLElement>('.photo-card-trigger')
+      if (trigger) trigger.tabIndex = visible ? 0 : -1
+      element.setAttribute('aria-hidden', String(!visible))
+    }
 
     drawRef.current = () => {
       const now = performance.now()
@@ -115,24 +136,44 @@ export function useWallMotion({
       const toEffect = WALL_EFFECTS[motion.effectTo]
       const useLightPath = motion.effectTo === 'grid' && effectProgress >= 0.999
 
+      // wrap：整墙共享一个回绕后的相机位置（替代原来逐卡片/逐轴回绕）
+      const wrappedX = wrapField(motion.current.x, fieldWidth)
+      const wrappedY = wrapField(motion.current.y, fieldHeight)
+
       for (const [slotIndex, element] of tileRefs.current.entries()) {
         const column = slotIndex % layout.columns
         const row = Math.floor(slotIndex / layout.columns)
-        const rawX = column * period + marginX - motion.current.x
-        const rawY = row * period + marginY - motion.current.y
-        const x = rawX - Math.round((rawX + period / 2 - layout.width / 2) / fieldWidth) * fieldWidth
-        const y = rawY - Math.round((rawY + period / 2 - layout.height / 2) / fieldHeight) * fieldHeight
+        const x = marginX + column * period - wrappedX
+        const y = marginY + row * period - wrappedY
+
+        // 视野预判垫一个周期：宁可多渲染也不在快速拖动时露边；
+        // 离屏卡片只做一次 park 写入，避免每帧矩阵计算与样式写入。
+        const visible = x + layout.card >= -period && x <= layout.width + period
+          && y + layout.card >= -period && y <= layout.height + period
+        if (!visible) {
+          if (!parked.has(element)) {
+            parked.add(element)
+            applyTransform(element, 'translate3d(-20000px, -20000px, 0)')
+            applyVisibility(element, false)
+          }
+          continue
+        }
+        parked.delete(element)
+        applyVisibility(element, true)
 
         let transform: string
         if (useLightPath) {
+          // 网格静置路径：translate 定位 + 围绕卡片中心做轻倾斜（transform-origin: top left，居中补偿显式写出）
           const nx = (x + layout.card / 2 - layout.width / 2) / Math.max(layout.width / 2, 1)
           const ny = (y + layout.card / 2 - layout.height / 2) / Math.max(layout.height / 2, 1)
           const distance = Math.min(1.4, nx * nx + ny * ny)
           const scale = 1 + distance * 0.035
           const tiltX = clamp(-ny * 1.2, -1.8, 1.8)
           const tiltY = clamp(nx * 1.2, -1.8, 1.8)
-          transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) perspective(1200px) rotateX(${tiltX.toFixed(2)}deg) rotateY(${tiltY.toFixed(2)}deg) scale(${scale.toFixed(4)})`
+          const half = layout.card / 2
+          transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) translate3d(${half.toFixed(2)}px, ${half.toFixed(2)}px, 0) perspective(1200px) rotateX(${tiltX.toFixed(2)}deg) rotateY(${tiltY.toFixed(2)}deg) scale(${scale.toFixed(4)}) translate3d(${-half.toFixed(2)}px, ${-half.toFixed(2)}px, 0)`
         } else {
+          // warp + inset + matrix3d：变形作用于 period 盒四角，相邻卡片共享晶格点
           const lattice = [
             { x, y },
             { x: x + period, y },
@@ -151,16 +192,7 @@ export function useWallMotion({
           transform = quadMatrix(layout.card, topLeft, topRight, bottomLeft, bottomRight)
         }
 
-        if (element.style.transform !== transform) element.style.transform = transform
-
-        const rect = element.getBoundingClientRect()
-        const visible = rect.right > 0 && rect.left < layout.width && rect.bottom > 0 && rect.top < layout.height
-        if (element.dataset.visible !== String(visible)) {
-          element.dataset.visible = String(visible)
-          const trigger = element.querySelector<HTMLElement>('.photo-card-trigger')
-          if (trigger) trigger.tabIndex = visible ? 0 : -1
-          element.setAttribute('aria-hidden', String(!visible))
-        }
+        applyTransform(element, transform)
       }
 
       const cursorMatters = motion.effectFrom === 'dome' || motion.effectTo === 'dome'
