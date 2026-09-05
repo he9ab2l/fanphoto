@@ -2,7 +2,7 @@
 import os, struct, sys
 sys.stdout.reconfigure(encoding='utf-8')
 
-folder = r"D:\fffaa-photo\test-photo"
+folder = r"D:\fffaa-photo\test-photo\scenic"
 
 MARKERS = {0xC0:'SOF0',0xC1:'SOF1',0xC2:'SOF2',0xC4:'DHT',0xDA:'SOS',0xDB:'DQT',0xDD:'DRI',
     0xE0:'APP0',0xE1:'APP1',0xE2:'APP2',0xE3:'APP3',0xE4:'APP4',0xE5:'APP5',0xE6:'APP6',

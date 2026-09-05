@@ -1,8 +1,8 @@
 // 真实渲染 QA：连接本地无头 Chrome，抓取演示截图 + 收集 JS 错误
 import { writeFileSync } from 'node:fs';
 
-const URL = process.env.QA_URL || process.argv[2] || 'file:///D:/fffaa-photo/demo/no-gl-grid/index.html';
-const OUT = process.argv[3] || (import.meta.dirname + '/../demo/_qa');
+const URL = process.env.QA_URL || process.argv[2] || 'http://localhost:5173/';
+const OUT = process.argv[3] || (import.meta.dirname + '/../apps/web/_qa');
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
 const list = await (await fetch('http://127.0.0.1:9222/json/list')).json();
@@ -62,6 +62,10 @@ await send('Runtime.enable');
 await send('Page.navigate', { url: URL });
 await sleep(5000);
 await shot('grid');
+const uniqueSrcs = await evalJs(`new Set([...document.querySelectorAll('.card img')].map((i) => i.getAttribute('src'))).size`);
+console.log('unique images:', uniqueSrcs);
+const loaded = await evalJs(`[...document.querySelectorAll('.card img')].filter((i) => i.complete && i.naturalWidth > 0).length`);
+console.log('loaded images:', loaded);
 
 // 轻点照片：验证 pointer capture 后点击仍能打开翻转
 await clickCard(3);

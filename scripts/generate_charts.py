@@ -3,7 +3,7 @@ import os, sys
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageChops
 sys.stdout.reconfigure(encoding='utf-8')
 
-folder = r"D:\fffaa-photo\test-photo"
+folder = r"D:\fffaa-photo\test-photo\scenic"
 outdir = r"D:\fffaa-photo\histograms"
 os.makedirs(outdir, exist_ok=True)
 
