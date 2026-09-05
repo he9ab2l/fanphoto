@@ -47,6 +47,13 @@ export function NoGlWall({ images }: NoGlWallProps) {
       <div id="torch" className="off" />
       <div id="torch-ring" className="off" />
 
+      <div id="interactionHint" className="interaction-hint" aria-hidden="true">
+        <span>拖动浏览</span>
+        <span className="hint-dot" />
+        <span>点击照片查看详情</span>
+      </div>
+      <div id="wallStatus" className="wall-status" role="status" aria-live="polite" aria-atomic="true" />
+
       <header id="ui">
         <div className="brand">
           <span className="brand-icon">
@@ -79,7 +86,7 @@ export function NoGlWall({ images }: NoGlWallProps) {
             <use href="#i-zoom-out" />
           </svg>
         </button>
-        <span id="zoomValue" className="zoom-value">100%</span>
+        <span id="zoomValue" className="zoom-value" aria-live="polite">100%</span>
         <button id="btnZoomIn" type="button" className="dock-btn" title="放大" aria-label="放大">
           <svg className="icon">
             <use href="#i-zoom-in" />

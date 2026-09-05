@@ -8,7 +8,8 @@ let rafId = 0;
 let attached = false;
 
 let stage, gridEl, torchEl, torchGlowEl, torchRingEl, dimEl, coverEl;
-let btnTorch, btnReset, btnZoomIn, btnZoomOut, btnFit, zoomValue;
+let btnTorch, btnReset, btnZoomIn, btnZoomOut, btnFit, zoomValue, statusEl, interactionHint;
+let statusTimer = 0;
 
 /* ---------------- 可调参数 ---------------- */
 const BOW = 0.06;
@@ -19,17 +20,16 @@ const DAMP_PAN = 0.1;
 const DAMP_FLIP = 0.12;
 const DAMP_CURSOR = 0.16;
 const SHADE = 0.55;
-const GAP = 12;
+const GAP = 8;
 const RADIUS = 12;
 const IMG_BLEED = 1.1;
-const FLIP_MARGIN = 0.11;
+const FLIP_MARGIN = 0.16;
 const CARD_TARGET = 330;
-const PANEL_RATIO = 0.3;
+const PANEL_RATIO = 0.42;
 const PANEL_GAP = 8;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2.3;
 
-const VER = '2026.09';
 
 /* ---------------- 状态 ---------------- */
 const state = {
@@ -71,8 +71,9 @@ const wrap = (min, max, v) => {
   const r = max - min;
   return min + (((v - min) % r + r) % r);
 };
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const damp = (from, to, rate, dt) =>
-  from + (to - from) * (1 - Math.pow(1 - rate, dt));
+  reduceMotion.matches ? to : from + (to - from) * (1 - Math.pow(1 - rate, dt));
 const smooth = (t) => t * t * (3 - 2 * t);
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -80,6 +81,21 @@ const escapeHtml = (s) =>
   String(s).replace(/[&<>"']/g, (m) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])
   );
+
+const imageFormat = (src) => {
+  const match = String(src).match(/\.([a-z0-9]+)(?:[?#]|$)/i);
+  const format = match?.[1]?.toUpperCase() || '图片';
+  return format === 'JPG' ? 'JPEG' : format;
+};
+
+function showStatus(message) {
+  if (!statusEl) return;
+  clearTimeout(statusTimer);
+  statusEl.textContent = message;
+  statusEl.classList.remove('visible');
+  requestAnimationFrame(() => statusEl.classList.add('visible'));
+  statusTimer = setTimeout(() => statusEl?.classList.remove('visible'), 1600);
+}
 
 const warp = (px, py) => {
   const halfW = state.w / 2;
@@ -184,6 +200,9 @@ function build() {
       const title = item ? item.title : '空';
       const el = document.createElement('figure');
       el.className = 'card';
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      el.setAttribute('aria-label', item ? `查看 ${title} 的详情` : '空照片位');
       const id = cardSeq++;
       el.dataset.cardId = String(id);
       el.innerHTML =
@@ -197,12 +216,28 @@ function build() {
         `<svg class="icon"><use href="#i-close"/></svg>` +
         `</button>` +
         `<h3 class="p-title">${escapeHtml(title)}</h3>` +
-        `<p class="p-desc">高清照片 · 个人摄影档案</p>` +
-        `<div class="meta"><span>${n} 张</span><span>${VER}</span></div>` +
+        `<p class="p-desc">${item ? `${imageFormat(item.src)} 照片` : '暂无照片信息'}</p>` +
+        `<dl class="meta">` +
+        `<div><dt>序号</dt><dd>${item ? `${imgIdx + 1} / ${n}` : '—'}</dd></div>` +
+        `<div><dt>分辨率</dt><dd class="meta-resolution">读取中</dd></div>` +
+        `<div><dt>画面</dt><dd class="meta-orientation">—</dd></div>` +
+        `</dl>` +
         `</aside>`;
       const img = el.querySelector('img');
       if (item) img.src = item.src;
-      img.addEventListener('error', () => el.querySelector('.media').classList.add('broken'));
+      img.addEventListener('load', () => {
+        const width = img.naturalWidth;
+        const height = img.naturalHeight;
+        const resolution = el.querySelector('.meta-resolution');
+        const orientation = el.querySelector('.meta-orientation');
+        if (resolution) resolution.textContent = `${width} × ${height}`;
+        if (orientation) orientation.textContent = width === height ? '方形' : width > height ? '横向' : '竖向';
+      });
+      img.addEventListener('error', () => {
+        el.querySelector('.media').classList.add('broken');
+        const resolution = el.querySelector('.meta-resolution');
+        if (resolution) resolution.textContent = '不可用';
+      });
       gridEl.appendChild(el);
       cards.push({
         el,
@@ -299,6 +334,7 @@ function setTorch(on) {
   }
   btnTorch.classList.toggle('on', on);
   btnTorch.setAttribute('aria-pressed', String(on));
+  showStatus(on ? '手电筒已开启' : '手电筒已关闭');
   if (on) {
     state.raw.x = 0;
     state.raw.y = 0;
@@ -483,6 +519,7 @@ const onPointerDown = (e) => {
     moved: 0,
   };
   state.press = { target: e.target, x: e.clientX, y: e.clientY };
+  e.target.closest?.('.card')?.classList.add('pressed');
   state.vel = 0;
   state.lastPt = { x: e.clientX, y: e.clientY, t: performance.now() };
   stage.classList.add('dragging');
@@ -522,6 +559,7 @@ function releasePointer(e) {
   if (pointers.size < 2) state.pinch = null;
   if (pointers.size < 1) {
     stage.classList.remove('dragging');
+    for (const card of cards) card.el.classList.remove('pressed');
     state.lastDragMoved = state.drag ? state.drag.moved : state.lastDragMoved;
     if (state.press && state.lastDragMoved <= 8) handleCardPress(state.press.target);
     state.press = null;
@@ -555,6 +593,13 @@ const onKeyDown = (e) => {
       break;
     case 'Escape':
       state.flip.tgt = 0;
+      showStatus('详情已关闭');
+      break;
+    case 'Enter':
+      if (document.activeElement?.classList.contains('card')) {
+        handleCardPress(document.activeElement.querySelector('.media'));
+        e.preventDefault();
+      }
       break;
     case 'Digit0':
       setZoom(1);
@@ -578,6 +623,7 @@ function handleCardPress(target) {
   const closeBtn = target.closest('.close');
   if (closeBtn) {
     state.flip.tgt = 0;
+    showStatus('详情已关闭');
     return;
   }
   const cardEl = target.closest('.card');
@@ -590,10 +636,12 @@ function handleCardPress(target) {
   if (!cell || cell.itemId < 0) return;
   if (state.flip.id === cell.id) {
     state.flip.tgt = 0;
+    showStatus('详情已关闭');
     return;
   }
   state.flip.id = cell.id;
   state.flip.tgt = 1;
+  showStatus(`${wallImages[cell.itemId].title} · 详情已打开`);
 }
 
 /* ---------------- 缩放 ---------------- */
@@ -601,6 +649,7 @@ function updateZoomUI() {
   zoomValue.textContent = `${Math.round(state.zoom * 100)}%`;
   btnZoomIn.disabled = state.zoom >= MAX_ZOOM - 0.001;
   btnZoomOut.disabled = state.zoom <= MIN_ZOOM + 0.001;
+  btnFit.classList.toggle('on', Math.abs(state.zoom - 1) < 0.001);
 }
 
 function setZoom(next) {
@@ -612,14 +661,19 @@ function setZoom(next) {
   state.y.cur = state.y.tgt = 0;
   build();
   updateZoomUI();
+  showStatus(`缩放 ${Math.round(state.zoom * 100)}%`);
 }
 
 /* ---------------- UI ---------------- */
+const onStageClick = (e) => {
+  if (e.target.closest?.('.close')) handleCardPress(e.target);
+};
 const onTorchClick = () => setTorch(!state.torch);
 const onResetClick = () => {
   state.x.tgt = 0;
   state.y.tgt = 0;
   state.flip.tgt = 0;
+  showStatus('已回到照片墙中心');
 };
 const onZoomIn = () => setZoom(state.zoom * 1.14);
 const onZoomOut = () => setZoom(state.zoom / 1.14);
@@ -641,6 +695,7 @@ function scheduleResize() {
 function attachListeners() {
   if (attached || !stage || !btnTorch) return;
   stage.addEventListener('wheel', onWheel, { passive: false });
+  stage.addEventListener('click', onStageClick);
   stage.addEventListener('pointerdown', onPointerDown);
   stage.addEventListener('pointermove', onPointerMove);
   stage.addEventListener('pointerup', releasePointer);
@@ -659,6 +714,7 @@ function attachListeners() {
 function detachListeners() {
   if (!attached || !stage) return;
   stage.removeEventListener('wheel', onWheel);
+  stage.removeEventListener('click', onStageClick);
   stage.removeEventListener('pointerdown', onPointerDown);
   stage.removeEventListener('pointermove', onPointerMove);
   stage.removeEventListener('pointerup', releasePointer);
@@ -690,6 +746,8 @@ export function initWall(images) {
   btnZoomOut = document.getElementById('btnZoomOut');
   btnFit = document.getElementById('btnFit');
   zoomValue = document.getElementById('zoomValue');
+  statusEl = document.getElementById('wallStatus');
+  interactionHint = document.getElementById('interactionHint');
   if (!stage || !gridEl || !coverEl) return;
 
   for (const c of cards) c.el.remove();
@@ -725,6 +783,7 @@ export function initWall(images) {
   if (!attached) attachListeners();
   build();
   updateZoomUI();
+  setTimeout(() => interactionHint?.classList.add('hidden'), 5000);
   if (rafId) cancelAnimationFrame(rafId);
   const loop = () => {
     draw();
@@ -736,6 +795,7 @@ export function initWall(images) {
 export function destroyWall() {
   if (rafId) cancelAnimationFrame(rafId);
   rafId = 0;
+  clearTimeout(statusTimer);
   detachListeners();
   for (const c of cards) c.el.remove();
   cards = [];
