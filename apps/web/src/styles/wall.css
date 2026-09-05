@@ -68,6 +68,7 @@ body {
   display: grid;
   width: max-content;
   gap: var(--gap);
+  contain: layout style;
 }
 
 /* ---------- 卡片 ---------- */
@@ -76,10 +77,10 @@ body {
   width: var(--card);
   height: var(--card);
   transform-origin: top left;
-  will-change: transform;
   z-index: 1;
   cursor: pointer;
   outline: none;
+  contain: layout paint;
 }
 .card.flipped {
   z-index: 50;
@@ -112,7 +113,6 @@ body {
   object-fit: cover;
   transform: scale(1.1);
   pointer-events: none;
-  will-change: transform;
 }
 .media.broken img {
   display: none;
@@ -273,7 +273,7 @@ body {
 #dim {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 40;
   background: #000;
   opacity: 0;
   pointer-events: none;

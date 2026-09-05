@@ -17,7 +17,7 @@ const BULGE = 0.16;
 const REACH = 1.5;
 const FLIP = 0.7;
 const DAMP_PAN = 0.1;
-const DAMP_FLIP = 0.12;
+const DAMP_FLIP = 0.2;
 const DAMP_CURSOR = 0.16;
 const SHADE = 0.55;
 const GAP = 8;
@@ -54,7 +54,8 @@ const state = {
   torch: false,
   torchOpacity: -1,
   cardDimOpacity: -1,
-  flip: { id: -1, p: 0, tgt: 0 },
+  flip: { id: -1, p: 0, tgt: 0, pendingId: -1 },
+  transition: { fromId: -1, toId: -1, p: 0, tgt: 0 },
   hole: 300,
   holeX: -1,
   holeY: -1,
@@ -172,12 +173,11 @@ function build() {
   state.cols = clamp(Math.round(state.w / target), 2, 8);
   state.card = clamp((state.w - (state.cols - 1) * GAP) / state.cols, 120, 760);
   state.period = state.card + GAP;
-  state.rows = Math.max(2, Math.ceil(innerHeight / state.period));
-
-  // 照片数量超过单屏格子时补足行数，保证全部照片至少出现一次
-  if (wallImages.length > state.cols * state.rows) {
-    state.rows = Math.ceil(wallImages.length / state.cols);
-  }
+  const visibleRows = Math.max(2, Math.ceil(innerHeight / state.period));
+  // 只保留可视区域附近的缓冲行。照片会通过 deck 循环复用，避免一次创建上百个
+  // 卡片并在拖动时对它们全部计算透视矩阵。
+  state.rows = Math.min(Math.ceil(wallImages.length / state.cols) || visibleRows, visibleRows + 2);
+  state.rows = Math.max(2, state.rows);
 
   // +2 是承重细节：换行卡片翻越边缘前需在两侧各留至少一个整格
   const cols = state.cols + 2;
@@ -262,16 +262,20 @@ function build() {
 
 function preloadImages() {
   if (preloadStarted || coverEl.classList.contains('done')) return;
+  preloadStarted = true;
   const unique = [...new Set(wallImages.map((i) => i.src))];
   if (!unique.length) {
     revealCover();
     return;
   }
+  const initial = unique.slice(0, Math.min(unique.length, 12));
   let settled = 0;
   const done = () => {
-    if (++settled >= unique.length) revealCover();
+    if (++settled >= initial.length) revealCover();
   };
-  for (const src of unique) {
+  // 只等待首屏附近的图片，剩余图片交给原生 lazy loading，避免启动阶段
+  // 同时解码几十张大图造成长任务和闪屏。
+  for (const src of initial) {
     const im = new Image();
     im.decoding = 'async';
     im.onload = done;
@@ -353,6 +357,27 @@ function draw() {
   state.cursor.y = damp(state.cursor.y, state.raw.y, DAMP_CURSOR, dt);
   state.lag = lerp(state.lag, state.vel, 0.07);
   state.flip.p = damp(state.flip.p, state.flip.tgt, DAMP_FLIP, dt);
+  state.transition.p = damp(state.transition.p, state.transition.tgt, DAMP_FLIP, dt);
+
+  // 照片切换时，旧卡片归位和新卡片展开共用同一个进度并行播放。
+  if (state.transition.tgt === 1 && state.transition.p > 0.998) {
+    state.flip.id = state.transition.toId;
+    state.flip.p = 1;
+    state.flip.tgt = 1;
+    state.transition = { fromId: -1, toId: -1, p: 0, tgt: 0 };
+  }
+
+  // 关闭动画完成后再切换到下一张，切换时从 0 重新开始，且允许在动画中
+  // 反复点击来打断并反向播放。
+  if (state.flip.tgt === 0 && state.flip.p < 0.002) {
+    if (state.flip.pendingId >= 0) {
+      state.flip.id = state.flip.pendingId;
+      state.flip.pendingId = -1;
+      state.flip.tgt = 1;
+    } else if (state.flip.id >= 0) {
+      state.flip.id = -1;
+    }
+  }
 
   const { w, h, card } = state;
   const halfW = w / 2;
@@ -364,7 +389,9 @@ function draw() {
   const pad = state.period;
 
   const flipE = smooth(clamp(state.flip.p, 0, 1));
-  const flipActive = state.flip.id >= 0;
+  const switching = state.transition.fromId >= 0 && state.transition.toId >= 0;
+  const switchE = smooth(clamp(state.transition.p, 0, 1));
+  const flipActive = state.flip.id >= 0 || switching;
 
   const shadeLevel = SHADE * flipE;
   if (Math.abs(shadeLevel - state.cardDimOpacity) > 0.004) {
@@ -372,7 +399,8 @@ function draw() {
     const opacity = shadeLevel.toFixed(3);
     dimEl.style.opacity = opacity;
     for (const cell of cards) {
-      cell.dim.style.opacity = cell.id === state.flip.id ? '0' : opacity;
+      // 统一由 #dim 做全局暗化，避免每张照片单独叠加遮罩造成亮度不一致。
+      cell.dim.style.opacity = '0';
     }
   }
 
@@ -397,6 +425,7 @@ function draw() {
     Math.abs(state.x.cur - state.x.tgt) < 0.01 &&
     Math.abs(state.y.cur - state.y.tgt) < 0.01 &&
     Math.abs(state.flip.p - state.flip.tgt) < 0.0005 &&
+    Math.abs(state.transition.p - state.transition.tgt) < 0.0005 &&
     Math.abs(state.cursor.x - state.raw.x) < 0.05 &&
     Math.abs(state.cursor.y - state.raw.y) < 0.05;
 
@@ -420,7 +449,14 @@ function draw() {
     const sy = py - Math.round((py - halfH) / maxY) * maxY;
 
     const isFlipCard = flipActive && cell.id === state.flip.id;
-    if (!isFlipCard) {
+    const isSwitchFrom = switching && cell.id === state.transition.fromId;
+    const isSwitchTo = switching && cell.id === state.transition.toId;
+    // 切换时新卡片压在旧卡片之上，且两张详情卡都位于全局暗层之上。
+    if (isSwitchFrom) cell.el.style.zIndex = '49';
+    else if (isSwitchTo) cell.el.style.zIndex = '51';
+    else if (isFlipCard) cell.el.style.zIndex = '50';
+    else cell.el.style.zIndex = '';
+    if (!isFlipCard && !isSwitchFrom && !isSwitchTo) {
       if (sx + card < -pad || sx > w + pad || sy + card < -pad || sy > h + pad) {
         if (!cell.parked) {
           cell.el.style.transform = 'translate(-4000px,-4000px)';
@@ -442,7 +478,15 @@ function draw() {
       p.y += halfH;
     }
 
-    if (flipActive && cell.id === state.flip.id && target) {
+    if (switching && target && (isSwitchFrom || isSwitchTo)) {
+      for (let i = 0; i < 4; i++) {
+        q[i] = isSwitchFrom
+          ? { x: lerp(target.q[i].x, q[i].x, switchE), y: lerp(target.q[i].y, q[i].y, switchE) }
+          : { x: lerp(q[i].x, target.q[i].x, switchE), y: lerp(q[i].y, target.q[i].y, switchE) };
+      }
+      cell.el.classList.add('flipped');
+      cell.el.style.setProperty('--slide', (isSwitchFrom ? 1 - switchE : switchE).toFixed(3));
+    } else if (flipActive && cell.id === state.flip.id && target) {
       const e = flipE;
       for (let i = 0; i < 4; i++) {
         q[i] = { x: lerp(q[i].x, target.q[i].x, e), y: lerp(q[i].y, target.q[i].y, e) };
@@ -592,8 +636,7 @@ const onKeyDown = (e) => {
       e.preventDefault();
       break;
     case 'Escape':
-      state.flip.tgt = 0;
-      showStatus('详情已关闭');
+      closeFlip();
       break;
     case 'Enter':
       if (document.activeElement?.classList.contains('card')) {
@@ -619,29 +662,57 @@ const onKeyDown = (e) => {
   }
 };
 
+function closeFlip(message = '详情已关闭') {
+  state.flip.pendingId = -1;
+  state.transition = { fromId: -1, toId: -1, p: 0, tgt: 0 };
+  if (state.flip.id >= 0) state.flip.tgt = 0;
+  showStatus(message);
+}
+
+function openFlip(cell) {
+  if (state.flip.id < 0) {
+    state.transition = { fromId: -1, toId: -1, p: 0, tgt: 0 };
+    state.flip.id = cell.id;
+    state.flip.p = 0;
+    state.flip.tgt = 1;
+    state.flip.pendingId = -1;
+    return;
+  }
+
+  if (state.flip.id === cell.id) {
+    // 点击正在打开/已经打开的卡片时反向播放；关闭过程中再次点击可立即反向。
+    state.transition = { fromId: -1, toId: -1, p: 0, tgt: 0 };
+    state.flip.pendingId = -1;
+    state.flip.tgt = state.flip.tgt === 1 ? 0 : 1;
+    return;
+  }
+
+  // 旧卡片从详情位置归位，同时新卡片从网格位置展开。
+  state.transition = { fromId: state.flip.id, toId: cell.id, p: 0, tgt: 1 };
+  state.flip.pendingId = -1;
+  state.flip.tgt = 1;
+}
+
 function handleCardPress(target) {
   const closeBtn = target.closest('.close');
   if (closeBtn) {
-    state.flip.tgt = 0;
-    showStatus('详情已关闭');
+    closeFlip();
     return;
   }
   const cardEl = target.closest('.card');
   const mediaEl = target.closest('.media');
   if (!cardEl || !mediaEl) {
-    state.flip.tgt = 0;
+    closeFlip();
     return;
   }
   const cell = cards.find((c) => c.el === cardEl);
   if (!cell || cell.itemId < 0) return;
-  if (state.flip.id === cell.id) {
-    state.flip.tgt = 0;
-    showStatus('详情已关闭');
-    return;
-  }
-  state.flip.id = cell.id;
-  state.flip.tgt = 1;
-  showStatus(`${wallImages[cell.itemId].title} · 详情已打开`);
+  openFlip(cell);
+  showStatus(
+    state.flip.id === cell.id && state.flip.tgt === 0
+      ? '详情已关闭'
+      : `${wallImages[cell.itemId].title} · 详情已打开`
+  );
 }
 
 /* ---------------- 缩放 ---------------- */
@@ -656,7 +727,8 @@ function setZoom(next) {
   const z = clamp(next, MIN_ZOOM, MAX_ZOOM);
   if (Math.abs(z - state.zoom) < 0.001) return;
   state.zoom = z;
-  state.flip = { id: -1, p: 0, tgt: 0 };
+  state.flip = { id: -1, p: 0, tgt: 0, pendingId: -1 };
+  state.transition = { fromId: -1, toId: -1, p: 0, tgt: 0 };
   state.x.cur = state.x.tgt = 0;
   state.y.cur = state.y.tgt = 0;
   build();
@@ -672,8 +744,7 @@ const onTorchClick = () => setTorch(!state.torch);
 const onResetClick = () => {
   state.x.tgt = 0;
   state.y.tgt = 0;
-  state.flip.tgt = 0;
-  showStatus('已回到照片墙中心');
+  closeFlip('已回到照片墙中心');
 };
 const onZoomIn = () => setZoom(state.zoom * 1.14);
 const onZoomOut = () => setZoom(state.zoom / 1.14);
@@ -687,7 +758,8 @@ function scheduleResize() {
   resizeTimer = setTimeout(() => {
     if (g !== state.gen) return;
     state.flip.tgt = 0;
-    state.flip = { id: -1, p: 0, tgt: 0 };
+    state.flip = { id: -1, p: 0, tgt: 0, pendingId: -1 };
+    state.transition = { fromId: -1, toId: -1, p: 0, tgt: 0 };
     build();
   }, 120);
 }
@@ -772,7 +844,8 @@ export function initWall(images) {
     torch: false,
     torchOpacity: -1,
     cardDimOpacity: -1,
-    flip: { id: -1, p: 0, tgt: 0 },
+    flip: { id: -1, p: 0, tgt: 0, pendingId: -1 },
+    transition: { fromId: -1, toId: -1, p: 0, tgt: 0 },
     hole: 300,
     holeX: -1,
     holeY: -1,
