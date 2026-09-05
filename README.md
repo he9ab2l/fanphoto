@@ -9,7 +9,7 @@
 
 - React 19 + Vite + TypeScript 照片墙：[`apps/web/`](apps/web/)
 - 70 张测试照片（`photo-001.jpg` ~ `photo-070.jpg`）位于 [`test-photo/scenic/`](test-photo/scenic/)
-- 零依赖无限照片墙交互：无限平移、穹顶弯曲、光标透镜、手电筒、卡片翻转、缩放
+- React 组件化无限照片墙：按需图片加载、无限平移、轻量穹顶效果、手电筒、非阻断详情面板、缩放
 - 设计与调研文档位于 [`docs/`](docs/)
 
 ## 运行
@@ -37,7 +37,7 @@ fffaa-photo/
 - 统一命名（`photo-NNN.jpg`，可重复运行）：`pwsh -NoProfile -File scripts/rename_scenic_photos.ps1`
 - 重新下载 50 张不同长宽比风景图：`pwsh -NoProfile -File scripts/download_scenic_photos.ps1`
 - 直方图/色板与隐藏数据扫描（需 Python 3.8+、Pillow）：`python scripts/generate_charts.py`、`python scripts/scan_hidden_data.py`
-- 真实渲染 QA（先启动开发服务器与 9222 端口无头 Chrome）：`node scripts/qa-demo.mjs`
+- 真实渲染 QA（覆盖桌面/移动端、查看器与控制项；先启动开发服务器及 9222 端口无头 Chrome）：`node scripts/qa-demo.mjs`
 
 ## 设计文档（技术基线）
 

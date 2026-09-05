@@ -1,4 +1,8 @@
-export interface ImageItem { src: string; title: string }
+export interface ImageItem {
+  src: string
+  title: string
+  alt?: string
+}
 
 export const images: ImageItem[] = [
   { src: "/photo-001.jpg", title: "photo-001" },

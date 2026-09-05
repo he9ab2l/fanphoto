@@ -1,6 +1,6 @@
 import { images } from './data/images'
-import { NoGlWall } from './no-gl/NoGlWall'
+import { GalleryWall } from './features/gallery/GalleryWall'
 
 export function App() {
-  return <NoGlWall images={images} />
+  return <GalleryWall images={images} />
 }
