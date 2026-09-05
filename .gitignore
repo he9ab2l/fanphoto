@@ -13,7 +13,3 @@ __pycache__/
 node_modules/
 apps/web/dist/
 apps/web/*.log
-
-# Local QA
-.chrome-qa/
-_qa-*.png

@@ -37,7 +37,6 @@ fffaa-photo/
 - 统一命名（`photo-NNN.jpg`，可重复运行）：`pwsh -NoProfile -File scripts/rename_scenic_photos.ps1`
 - 重新下载 50 张不同长宽比风景图：`pwsh -NoProfile -File scripts/download_scenic_photos.ps1`
 - 直方图/色板与隐藏数据扫描（需 Python 3.8+、Pillow）：`python scripts/generate_charts.py`、`python scripts/scan_hidden_data.py`
-- 真实渲染 QA（覆盖桌面/移动端、查看器与控制项；先启动开发服务器及 9222 端口无头 Chrome）：`node scripts/qa-demo.mjs`
 
 ## 设计文档（技术基线）
 
