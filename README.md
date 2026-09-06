@@ -1,66 +1,60 @@
-# fffaa-photo
+# Fanphoto
 
-自托管照片展示网站：个人相册与摄影作品站。
+自托管个人照片展示站：照片墙、相册、地图足迹与私密工作室。前后端一体，Hono + React，Node SQLite 存储。
 
-> 当前阶段：React 照片墙可用；Cloudflare 无服务器方案设计定稿，待实现。
-> 技术方向：浏览器端图片处理 + CF Pages/Functions + R2 + D1，React 19 前端。
+线上：<https://test.heabl.xyz>（开发预览，经 Cloudflare 代理）
 
-## 已完成
+## 技术栈
 
-- React 19 + Vite + TypeScript 照片墙：[`apps/web/`](apps/web/)
-- 70 张测试照片（`photo-001.jpg` ~ `photo-070.jpg`）位于 [`test-photo/scenic/`](test-photo/scenic/)
-- React 组件化无限照片墙：按需图片加载、无限平移、轻量穹顶效果、手电筒、非阻断详情面板、缩放
-- 设计与调研文档位于 [`docs/`](docs/)
+- **前端** `apps/web`：React 19 + Vite + TypeScript，React Router、TanStack Query、Motion、Maplibre GL
+- **后端** `apps/api`：Hono + Node SQLite（WAL）+ 文件存储，浏览器端图片处理
+- **共享** `packages/shared`：zod 校验 schema 与类型，前后端共用
+- **构建**：pnpm workspace + esbuild 单文件打包 API，Vite 构建 Web
 
-## 运行
+## 功能
 
-```bash
-cd apps/web
-pnpm install
-pnpm dev        # http://localhost:5173
-pnpm build      # 类型检查 + 构建
-```
+- 响应式照片网格（搜索 / 标签 / 精选 / 排序 / 游标分页）
+- 无限照片墙：拖拽平移、穹顶透视、聚光效果、触控缩放
+- 照片查看器：缩放平移、EXIF 信息、影调直方图、分享下载
+- 相册 / 地图足迹 / 关于页
+- 私密工作室（`/admin`）：上传队列、照片库批量操作、回收站、相册管理、站点设置、元数据导出
+- 图片处理：浏览器端解码 JPEG/PNG/WebP/AVIF/HEIC/TIFF，EXIF 白名单提取、4 档 WebP 变体、ThumbHash、主色与直方图、实况视频（MOV/MP4）配对与元数据擦除
+- 安全：会话 Cookie（HttpOnly）、CSRF、同源校验、登录限速、路径穿越防护、严格 CSP
 
 ## 目录
 
 ```text
-fffaa-photo/
-├── apps/web/           # React 19 + Vite + TypeScript 照片墙
-├── docs/               # 设计与调研文档
-├── scripts/            # 照片下载 / 清单生成 / 分析 / QA
-└── test-photo/scenic/  # 70 张统一命名的测试照片
+apps/web/            # React 前端
+apps/api/            # Hono 后端（src/ 源码，dist/ 由构建生成）
+apps/api/migrations/ # SQLite 迁移
+packages/shared/     # 前后端共享的 schema 与类型
+scripts/             # setup / seed / backup / 构建 / 部署
+deploy/              # systemd 单元
+tests/               # Node 单元测试 + Playwright 浏览器测试
+tools/               # 演示与测试素材生成工具
+docs/                # 架构与运维文档（docs/rebuild.md）
 ```
 
-## 照片管理
+## 开发
 
-- 新增/删除照片后重新生成清单：`node scripts/generate-web-images.mjs`
-- 统一命名（`photo-NNN.jpg`，可重复运行）：`pwsh -NoProfile -File scripts/rename_scenic_photos.ps1`
-- 重新下载 50 张不同长宽比风景图：`pwsh -NoProfile -File scripts/download_scenic_photos.ps1`
-- 直方图/色板与隐藏数据扫描（需 Python 3.8+、Pillow）：`python scripts/generate_charts.py`、`python scripts/scan_hidden_data.py`
+```bash
+pnpm install
+pnpm setup           # 生成 .env 与 admin-credentials.txt（含管理员密码）
+pnpm dev             # API :8787 + Web :5173（vite 代理 /api 与 /media）
+pnpm test            # Node 单元测试（api / media）
+pnpm test:e2e        # Playwright 浏览器测试
+pnpm build           # 类型检查 + Web 构建 + API 打包
+pnpm start           # 运行 apps/api/dist/server.mjs（需先 build）
+```
 
-## 设计文档（技术基线）
+## 生产部署（ten 服务器）
 
-| 文档 | 内容 |
-| --- | --- |
-| [无服务器照片站架构设计](docs/无服务器照片站架构设计.md) | 总体架构、API、部署、Roadmap |
-| [图片处理实现调研](docs/图片处理实现调研.md) | 处理管线与浏览器端适配 |
-| [存储与数据设计](docs/存储与数据设计.md) | R2 布局、D1 schema、一致性 |
-| [前端框架与架构](docs/前端框架与架构.md) | React 19 栈、目录、数据流 |
+```bash
+# 同步源码到服务器 workspace 后，在服务器上执行：
+bash scripts/release-ten.sh   # 安装依赖 → 测试 → 构建 → 备份 → 原子切换 release → 健康检查
+```
 
-### 参考调研
+systemd 单元 `deploy/fanphoto-dev.service`：运行 `apps/api/dist/server.mjs`，
+监听 `127.0.0.1:8787`，由 Caddy 反向代理并配 Cloudflare 证书与 DNS。
 
-- [ChronoFrame项目框架调研](docs/ChronoFrame项目框架调研.md)
-- [ChronoFrame地图展示实现调研](docs/ChronoFrame地图展示实现调研.md)
-- [Photoview项目调研](docs/Photoview项目调研.md)
-- [Lychee项目调研](docs/Lychee项目调研.md)
-- [gallery-dl工具调研](docs/gallery-dl工具调研.md)
-- [EXIF库选型参考](docs/EXIF库选型参考.md)
-- [图片元数据解析记录](docs/图片元数据解析记录.md)
-- [no-gl-grid-skill](docs/no-gl-grid-skill.md)
-
-## 参考项目
-
-- [ChronoFrame](https://github.com/HoshinoSuzumi/chronoframe)
-- [ExifTool](https://exiftool.org/)
-- [exifr](https://github.com/MikeKovarik/exifr)
-- [Sharp](https://sharp.pixelplumbing.com/)
+更多运维细节见 [docs/rebuild.md](docs/rebuild.md)。

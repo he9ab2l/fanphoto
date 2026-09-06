@@ -24,3 +24,6 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 admin-credentials.txt
+-e 
+# Demo source photos (large binaries; kept out of git)
+test-photo/
