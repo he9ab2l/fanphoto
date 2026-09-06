@@ -26,7 +26,11 @@ class Statement implements SqlStatement {
   }
   execute(): SqlResult {
     const query = this.db.prepare(this.sql)
-    if (query.columns().length)
+    // `StatementSync#columns()` is not available in every supported Node 22
+    // minor. The local adapter only executes read statements through this
+    // method in tests/batches, so classify them from the SQL verb instead of
+    // depending on the optional introspection API.
+    if (/^\s*(SELECT|WITH|PRAGMA|VALUES)\b/i.test(this.sql))
       return { results: query.all(...this.values), success: true, meta: {} }
     const result = query.run(...this.values)
     return { results: [], success: true, meta: { changes: Number(result.changes) } }

@@ -3258,3 +3258,18 @@ input[type='checkbox'] {
     will-change: auto;
   }
 }
+.photo-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 320px 420px;
+}
+@media (max-width: 650px) {
+  .public-layout:not(.canvas-layout) {
+    padding-bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+  .main-nav {
+    bottom: calc(18px + env(safe-area-inset-bottom));
+  }
+  .site-footer {
+    padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  }
+}

@@ -26,7 +26,10 @@ import {
 import type { ApiEnv, PhotoRow } from './types'
 
 export function photoRoutes(app: Hono<ApiEnv>) {
-  app.get('/api/photos', async (c) => c.json(await listPhotos(c.env, c.req.query())))
+  app.get('/api/photos', async (c) => {
+    c.header('Cache-Control', 'private, max-age=30, stale-while-revalidate=120')
+    return c.json(await listPhotos(c.env, c.req.query()))
+  })
   app.get('/api/admin/photos', requireAdmin, async (c) =>
     c.json(await listPhotos(c.env, c.req.query(), true)),
   )
