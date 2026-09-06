@@ -3,10 +3,11 @@ import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { MapPin, X, ArrowUpRight } from 'lucide-react'
 import type { Photo } from '@fanphoto/shared'
 import { api } from '../lib/api'
-import { Empty, ErrorState, IconButton, Spinner } from '../components/ui'
+import { Icon } from '../lib/icons'
+import { GlassIconButton } from '../components/public/controls'
+
 export default function MapPage() {
   const result = useQuery({
       queryKey: ['map'],
@@ -17,6 +18,7 @@ export default function MapPage() {
     location = useLocation()
   const [selected, setSelected] = useState<Photo | null>(null),
     [failed, setFailed] = useState(false)
+
   useEffect(() => {
     if (!container.current || !result.data) return
     const photos = result.data.photos
@@ -32,17 +34,14 @@ export default function MapPage() {
           sources: {
             base: {
               type: 'raster',
-              tiles: [
-                'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-                'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-              ],
+              tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],
               tileSize: 256,
               attribution:
                 '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
             },
           },
           layers: [
-            { id: 'background', type: 'background', paint: { 'background-color': '#e6ebe7' } },
+            { id: 'background', type: 'background', paint: { 'background-color': '#0b0b0c' } },
             { id: 'base', type: 'raster', source: 'base' },
           ],
         },
@@ -74,11 +73,10 @@ export default function MapPage() {
         source: 'photos',
         filter: ['has', 'point_count'],
         paint: {
-          'circle-color': '#1a665b',
-          'circle-radius': ['step', ['get', 'point_count'], 21, 10, 28, 50, 35],
-          'circle-stroke-width': 4,
+          'circle-color': '#3a3a3c',
+          'circle-radius': ['step', ['get', 'point_count'], 20, 10, 28, 50, 36],
+          'circle-stroke-width': 2,
           'circle-stroke-color': '#ffffff',
-          'circle-stroke-opacity': 0.8,
         },
       })
       instance.addLayer({
@@ -87,10 +85,10 @@ export default function MapPage() {
         source: 'photos',
         filter: ['!', ['has', 'point_count']],
         paint: {
-          'circle-color': '#1a665b',
-          'circle-radius': 9,
+          'circle-color': '#f2f2f2',
+          'circle-radius': 8,
           'circle-stroke-width': 3,
-          'circle-stroke-color': '#ffffff',
+          'circle-stroke-color': '#000000',
         },
       })
       instance.on('click', 'points', (event) => {
@@ -126,6 +124,7 @@ export default function MapPage() {
       map.current = null
     }
   }, [result.data])
+
   const focus = (photo: Photo) => {
     setSelected(photo)
     map.current?.flyTo({
@@ -133,69 +132,61 @@ export default function MapPage() {
       zoom: 10,
     })
   }
+
   return (
     <section className="map-page">
-      <div className="map-heading glass">
-        <MapPin size={18} />
-        <h1>足迹</h1>
+      <div className="map-heading liquid">
+        <Icon icon="mingcute:map-line" width={18} height={18} />
         <span>{result.data?.photos.length || 0}</span>
       </div>
       <div className="map-canvas" ref={container} aria-label="照片拍摄地点地图" />
       {result.isPending && (
-        <div className="map-empty">
-          <Spinner />
+        <div className="map-empty liquid">
+          <span className="dot-pulse" />
         </div>
       )}
       {result.isError && (
-        <div className="map-empty glass">
-          <ErrorState error={result.error} retry={() => void result.refetch()} />
+        <div className="map-empty liquid">
+          <p>足迹暂时无法加载</p>
+          <button className="liquid pill-btn" onClick={() => void result.refetch()}>
+            重试
+          </button>
         </div>
       )}
       {result.data && !result.data.photos.length && (
-        <div className="map-empty glass">
-          <Empty
-            title={result.data.enabled ? '足迹，留给下一次出发' : '位置信息未公开'}
-            detail={result.data.enabled ? '带有 GPS 的照片会出现在这里' : undefined}
-          />
+        <div className="map-empty liquid">
+          <p>{result.data.enabled ? '足迹，留给下一次出发' : '位置信息未公开'}</p>
         </div>
       )}
       {failed && (
-        <span className="map-notice glass" role="status">
-          底图暂不可用，照片列表仍可浏览
+        <span className="map-notice liquid" role="status">
+          底图暂不可用
         </span>
       )}
       {!!result.data?.photos.length && (
-        <aside className="map-photo-list glass" aria-label="地点列表">
+        <aside className="map-photo-list liquid" aria-label="地点列表">
           {result.data.photos.map((photo) => (
             <button
               key={photo.id}
               className={selected?.id === photo.id ? 'selected' : ''}
               onClick={() => focus(photo)}
+              aria-label={photo.title}
             >
               <img src={photo.urls.sm} alt="" loading="lazy" />
-              <span>
-                {photo.title}
-                <small>
-                  {photo.location ||
-                    `${photo.latitude?.toFixed(2)}, ${photo.longitude?.toFixed(2)}`}
-                </small>
-              </span>
-              <MapPin size={15} />
             </button>
           ))}
         </aside>
       )}
       {selected && (
-        <div className="map-preview glass">
-          <IconButton label="关闭地点预览" onClick={() => setSelected(null)}>
-            <X size={17} />
-          </IconButton>
+        <div className="map-preview liquid">
+          <GlassIconButton
+            label="关闭地点预览"
+            icon="close-line"
+            onClick={() => setSelected(null)}
+          />
           <Link to={`/photos/${selected.id}`} state={{ background: location }}>
             <img src={selected.urls.md} alt={selected.title} />
-            <span>
-              {selected.title}
-              <ArrowUpRight size={17} />
-            </span>
+            <span>{selected.title}</span>
           </Link>
         </div>
       )}

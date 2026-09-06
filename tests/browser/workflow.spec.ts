@@ -6,6 +6,13 @@ const login = async (page: Page) => {
   await page.getByRole('button', { name: '进入', exact: true }).click()
   await expect(page).toHaveURL(/\/admin$/)
 }
+const clickTile = async (page: Page, id?: string) => {
+  await page.evaluate((targetId) => {
+    const tiles = [...document.querySelectorAll<HTMLButtonElement>('.wall-tile')]
+    const tile = targetId ? tiles.find((el) => el.dataset.photoId === targetId) : tiles[0]
+    tile?.click()
+  }, id)
+}
 test('creator workflow: upload, album, editing, privacy, trash and public viewing', async ({
   page,
 }, info) => {
@@ -20,17 +27,17 @@ test('creator workflow: upload, album, editing, privacy, trash and public viewin
   await page.getByRole('button', { name: '保存相册', exact: true }).click()
   await expect(page.getByRole('heading', { name: albumTitle })).toBeVisible()
   await page.goto('/admin/upload')
-  await page.getByRole('combobox', { name: '相册', exact: true }).selectOption({ label: albumTitle })
+  await page
+    .getByRole('combobox', { name: '相册', exact: true })
+    .selectOption({ label: albumTitle })
   const uploaded = page.waitForResponse(
     (r) => r.url().endsWith('/api/photos/upload') && r.request().method() === 'POST',
   )
-  await page
-    .getByLabel('选择上传照片', { exact: true })
-    .setInputFiles({
-      name: `${title}.jpg`,
-      mimeType: 'image/jpeg',
-      buffer: await readFile('test-photo/scenic/photo-001.jpg'),
-    })
+  await page.getByLabel('选择上传照片', { exact: true }).setInputFiles({
+    name: `${title}.jpg`,
+    mimeType: 'image/jpeg',
+    buffer: await readFile('test-photo/scenic/photo-001.jpg'),
+  })
   const response = await uploaded
   expect(response.status(), await response.text()).toBe(201)
   const photo = (await response.json()).photo
@@ -46,23 +53,30 @@ test('creator workflow: upload, album, editing, privacy, trash and public viewin
   await page.getByRole('button', { name: '保存', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.goto(`/?q=${encodeURIComponent(title)}`)
-  await expect(page.locator('.photo-card')).toHaveCount(1)
-  await page.locator('.photo-card a').click()
-  await expect(page.getByRole('dialog')).toBeVisible()
-  await expect(page.locator('.viewer-image.loaded')).toBeVisible()
-  await page.getByRole('button', { name: '放大', exact: true }).click()
-  await expect(page.locator('.zoom-label')).toHaveText('150%')
-  await page.getByRole('button', { name: '重置缩放', exact: true }).click()
-  if (!(await page.locator('.photo-info').isVisible()))
-    await page.getByRole('button', { name: '照片信息', exact: true }).click()
-  await expect(page.locator('.photo-info')).toContainText('Browser verified photograph')
-  await expect(page.getByRole('img', { name: '亮度直方图' })).toBeVisible()
+  await expect(page.locator(`.wall-tile[data-photo-id="${photo.id}"]`).first()).toBeVisible()
+  await clickTile(page, photo.id)
+  const viewer = page.getByRole('dialog')
+  await expect(viewer).toBeVisible()
+  await expect(viewer.locator('.viewer-image.loaded')).toBeVisible()
+  await viewer.getByRole('button', { name: '放大', exact: true }).click()
+  await expect(viewer.locator('.zoom-label')).toHaveText('150%')
+  await viewer.getByRole('button', { name: '重置缩放', exact: true }).click()
+  if (!(await viewer.locator('.photo-info').isVisible()))
+    await viewer.getByRole('button', { name: '照片信息', exact: true }).click()
+  await expect(viewer.locator('.photo-info')).toContainText('Browser verified photograph')
+  await expect(viewer.getByRole('img', { name: '亮度直方图' })).toBeVisible()
   await page.screenshot({ path: `artifacts/${info.project.name}-viewer.png` })
-  await page.getByRole('button', { name: '关闭', exact: true }).click()
-  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await viewer.getByRole('button', { name: '关闭', exact: true }).click()
+  await expect(viewer).toHaveCount(0)
   await page.goto('/albums')
-  await page.getByRole('heading', { name: albumTitle }).click()
-  await expect(page.locator('.photo-card')).toHaveCount(1)
+  await expect(page.locator('.wall-tile').first()).toBeVisible()
+  await page.evaluate((album) => {
+    const tile = [...document.querySelectorAll<HTMLButtonElement>('.wall-tile')].find((el) =>
+      el.getAttribute('aria-label')?.includes(album),
+    )
+    tile?.click()
+  }, albumTitle)
+  await expect(page.locator('.wall-tile').first()).toBeVisible()
   await page.goto('/map')
   await expect(page.getByRole('button', { name: new RegExp(`${title} edited`) })).toBeVisible()
   await page.getByRole('button', { name: new RegExp(`${title} edited`) }).click()
@@ -99,11 +113,11 @@ test('gallery and canvas are responsive, keyboard-accessible and error-free', as
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto('/')
-  await expect(page.locator('.photo-card').first()).toBeVisible()
-  await expect(page.locator('.photo-card img').first()).toHaveJSProperty('complete', true)
+  await expect(page.locator('.wall-tile').first()).toBeVisible()
+  await expect(page.locator('.wall-tile img').first()).toHaveJSProperty('complete', true)
   expect(
     await page
-      .locator('.photo-card img')
+      .locator('.wall-tile img')
       .first()
       .evaluate((image: HTMLImageElement) => image.naturalWidth),
   ).toBeGreaterThan(0)
@@ -111,7 +125,7 @@ test('gallery and canvas are responsive, keyboard-accessible and error-free', as
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBe(true)
   await page.screenshot({ path: `artifacts/${info.project.name}-gallery.png`, fullPage: false })
-  await page.getByRole('link', { name: '无限照片墙', exact: true }).click()
+  await page.goto('/wall')
   await expect(page.locator('.wall-tile').first()).toBeVisible()
   const start = await page
     .locator('.wall-tile')
@@ -130,9 +144,9 @@ test('gallery and canvas are responsive, keyboard-accessible and error-free', as
   await page.getByRole('button', { name: '聚光效果', exact: true }).click()
   await expect(page.locator('.wall-shade')).toHaveClass(/enabled/)
   await page.getByRole('button', { name: '放大照片墙', exact: true }).click()
-  await expect(page.locator('.wall-controls .zoom-label')).toHaveText('115%')
+  await expect(page.locator('.grid-toolbar .zoom-label')).toHaveText('115%')
   await page.getByRole('button', { name: '重置照片墙', exact: true }).click()
-  await expect(page.locator('.wall-controls .zoom-label')).toHaveText('100%')
+  await expect(page.locator('.grid-toolbar .zoom-label')).toHaveText('100%')
   await page.screenshot({ path: `artifacts/${info.project.name}-wall.png` })
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
