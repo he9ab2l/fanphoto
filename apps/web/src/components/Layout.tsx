@@ -1,27 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { motion } from 'motion/react'
-import {
-  Aperture,
-  Images,
-  Layers,
-  Map,
-  Search,
-  Moon,
-  Sun,
-  Settings2,
-  UserRound,
-  WifiOff,
-} from 'lucide-react'
+import { Aperture, Images, Layers, Map, Moon, Search, Sun, Settings2, UserRound, WifiOff } from 'lucide-react'
 import { useAuth, useSite } from '../lib/api'
 import { IconButton } from './ui'
+
 export function Layout() {
-  const location = useLocation(),
-    site = useSite(),
-    auth = useAuth()
-  const [theme, setTheme] = useState(() => localStorage.getItem('fanphoto-theme') || 'light'),
-    [online, setOnline] = useState(navigator.onLine)
+  const location = useLocation()
+  const site = useSite()
+  const auth = useAuth()
+  const [theme, setTheme] = useState(() => localStorage.getItem('fanphoto-theme') || 'light')
+  const [online, setOnline] = useState(navigator.onLine)
   const wall = location.pathname === '/wall'
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('fanphoto-theme', theme)
@@ -38,86 +28,43 @@ export function Layout() {
       window.removeEventListener('offline', update)
     }
   }, [])
+
   const nav = [
-    { to: '/', icon: Images, label: '照片', active: location.pathname === '/' || wall },
-    { to: '/albums', icon: Layers, label: '相册', active: location.pathname.startsWith('/albums') },
-    { to: '/map', icon: Map, label: '足迹', active: location.pathname === '/map' },
+    { to: '/', icon: Images, label: 'Archive', sub: '照片', active: location.pathname === '/' || wall },
+    { to: '/albums', icon: Layers, label: 'Sets', sub: '相册', active: location.pathname.startsWith('/albums') },
+    { to: '/map', icon: Map, label: 'Places', sub: '足迹', active: location.pathname === '/map' },
   ]
   return (
-    <div className={`public-layout ${wall ? 'canvas-layout' : ''}`}>
-      <a className="skip-link" href="#main">
-        跳到内容
-      </a>
-      <div className="ambient" aria-hidden="true">
-        <i />
-        <i />
-      </div>
-      <header className={`site-header ${wall ? 'inverse' : ''}`}>
-        <Link className="wordmark" to="/" aria-label="Fanphoto 首页">
-          <span className="brand-icon">
-            <Aperture size={25} strokeWidth={1.6} />
-          </span>
-          <span>{site.data?.site.title || 'Fanphoto'}</span>
+    <div className={`site-shell ${wall ? 'canvas-layout' : ''}`}>
+      <a className="skip-link" href="#main">跳到内容</a>
+      <div className="noise" aria-hidden="true" />
+      <header className="topbar">
+        <Link className="brand-lockup" to="/" aria-label="Fanphoto 首页">
+          <span className="brand-mark"><Aperture size={23} strokeWidth={1.8} /></span>
+          <span className="brand-name">{site.data?.site.title || 'Fanphoto'}</span>
+          <span className="brand-year">/ 2026</span>
         </Link>
-        <nav className="main-nav glass" aria-label="主导航">
+        <nav className="primary-nav" aria-label="主导航">
           {nav.map((item) => (
-            <Link
-              className={`nav-item ${item.active ? 'active' : ''}`}
-              to={item.to}
-              key={item.to}
-              aria-current={item.active ? 'page' : undefined}
-            >
-              {item.active && (
-                <motion.span
-                  className="nav-bubble"
-                  layoutId="public-nav"
-                  transition={{ type: 'spring', stiffness: 410, damping: 32 }}
-                />
-              )}
-              <item.icon size={18} />
-              <span>{item.label}</span>
+            <Link className={`primary-link ${item.active ? 'active' : ''}`} to={item.to} key={item.to} aria-current={item.active ? 'page' : undefined}>
+              <span className="nav-en">{item.label}</span>
+              <span className="nav-cn">{item.sub}</span>
             </Link>
           ))}
         </nav>
-        <div className="header-actions glass">
-          <Link className="icon-button" to="/?search=1" title="搜索" aria-label="搜索照片">
-            <Search size={19} />
-          </Link>
-          <IconButton
-            label={theme === 'light' ? '深色模式' : '浅色模式'}
-            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-          >
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+        <div className="top-actions">
+          <Link className="action-link" to="/?search=1" aria-label="搜索照片"><Search size={17} /><span>搜索</span></Link>
+          <IconButton label={theme === 'light' ? '深色模式' : '浅色模式'} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+            {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
           </IconButton>
-          <Link
-            className="icon-button"
-            to={auth.data?.authenticated ? '/admin' : '/about'}
-            title={auth.data?.authenticated ? '工作室' : '关于'}
-            aria-label={auth.data?.authenticated ? '工作室' : '关于'}
-          >
-            {auth.data?.authenticated ? <Settings2 size={19} /> : <UserRound size={18} />}
+          <Link className="profile-link" to={auth.data?.authenticated ? '/admin' : '/about'} aria-label={auth.data?.authenticated ? '工作室' : '关于'}>
+            {auth.data?.authenticated ? <Settings2 size={17} /> : <UserRound size={17} />}
           </Link>
         </div>
       </header>
-      <main id="main">
-        <Outlet />
-      </main>
-      {!wall && location.pathname !== '/map' && (
-        <footer className="site-footer">
-          <span>
-            © {new Date().getFullYear()} {site.data?.site.author || 'Fan'}
-          </span>
-          <Link to="/admin">
-            工作室 <span aria-hidden="true">↗</span>
-          </Link>
-        </footer>
-      )}
-      {!online && (
-        <div className="offline-pill glass" role="status">
-          <WifiOff size={16} />
-          当前离线
-        </div>
-      )}
+      <main id="main"><Outlet /></main>
+      {!wall && <footer className="site-footer"><span>© {new Date().getFullYear()} {site.data?.site.author || 'Fan'}</span><Link to="/admin">工作室 <span aria-hidden="true">↗</span></Link></footer>}
+      {!online && <div className="offline-pill" role="status"><WifiOff size={15} /> 当前离线</div>}
     </div>
   )
 }
