@@ -79,3 +79,52 @@
 重构过程中移除：旧 React 照片墙与样式、静态图片清单、旧下载/分析脚本（ps1/py）、
 Cloudflare 无服务器架构调研文档、cloudflared 隧道方案（Caddy + CF DNS 替代）。
 演示源照片 `test-photo/` 不再入库（gitignore，本地保留供 tools/prepare-demo.py 生成演示数据）。
+
+## 2026-09 前端重构记录（no-GL 照片墙）
+
+公开前端整体重写为照片优先的沉浸式体验，后台工作室保留原功能与样式，避免破坏上传、批量操作与设置流程。
+
+### 设计语言
+
+- 配色严格黑白灰，页面背景 `#060606`，文字 `#f4f4f2`，无强调色
+- 按钮与浮层使用液态玻璃近似实现：`backdrop-filter: blur(22px) saturate(160%) contrast(1.05)`，叠加高光层与内阴影
+- 图标统一使用 MingCute，通过 `@iconify/react` 离线打包，不请求 CDN
+- 文案最小化，导航只保留图标与短标签，查看器信息默认隐藏
+
+### no-GL 照片墙
+
+核心实现位于 `apps/web/src/components/public/NoGlGrid.tsx`，参考 `no-gl-grid-skill .md` 与 https://grid-no-webgl.jesperlandberg.com/ ：
+
+- 每个可见卡片一帧一个 `matrix3d`，由 rect 到 quad 的 homography 解算
+- 周期取模实现无限平移，按视口只保留 `ceil(width/period)+2` 列与 `ceil(height/period)+2` 行
+- 穹顶弯曲与光标凸起作为 warp 项叠加，半格间隙统一内缩保证间距一致
+- 聚光遮罩使用 `mask-image` / 径向渐变，由 CSS 变量驱动
+- 点击卡片后按 FLIP 方式把四角插值到居中方形，再进入查看器；Escape 可取消
+- 全部输入走原生事件与 rAF，React state 只保存 zoom / curved / torch 等低频状态
+
+### 文件与配置
+
+- `apps/web/src/config/site.ts`：品牌、导航、网格、查看器参数
+- `apps/web/src/styles/public.css`：公开端完整样式，与后台 `app.css` 隔离
+- `apps/web/src/lib/icons.ts` + `mingcute-subset.json`：MingCute 图标本地子集
+- `apps/web/src/pages/`：Gallery / Wall / Albums / MapPage / About / Viewer
+- 调整网格手感时只改 `config/site.ts` 中的 `grid` 对象，不需要进入动画实现
+
+### 演示图片下载管线
+
+- `tools/fetch-commons-urls.py`：从 Wikimedia Commons 按比例配额挑选高清风景 URL
+- `gallery-dl`：实际下载工具，测试使用 Flickr 搜索（高清、比例多样、无需 API key）
+- `tools/select-photo-set.py`：从下载目录精选 100 张，覆盖竖幅 / 近方 / 横幅 / 全景
+- `tools/prepare-demo.py`：生成 4 档 WebP 与 manifest
+- `pnpm seed` 写入本地 SQLite，`artifacts/`、`data/`、`test-photo/` 不入库
+
+### 测试
+
+- `pnpm test`：13 项 Node 单元测试
+- `pnpm test:e2e`：Playwright 覆盖公开照片墙、查看器、相册、地图与后台工作室流程；HEIC 用例在缺少可选素材时跳过
+- E2E 服务读取 `apps/web/dist`，修改公开端代码后需先 `pnpm --filter @fanphoto/web build` 再跑测试
+
+### 已知说明
+
+- 后台工作室继续使用旧版 `app.css` 与 lucide 图标，未纳入本次视觉重构
+- Vite 主包仍有体积警告，主要来自 React Router / Motion / Maplibre；可后续按路由拆分 MapPage 与 Viewer 进一步优化
