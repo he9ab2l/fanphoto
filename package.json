@@ -1,0 +1,17 @@
+{
+  "name": "fanphoto", "version": "1.0.0", "private": true, "type": "module",
+  "packageManager": "pnpm@9.15.9", "engines": { "node": ">=22.16" },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @fanphoto/api --filter @fanphoto/web dev",
+    "build": "pnpm typecheck && pnpm --filter @fanphoto/web build && node scripts/build-api.mjs",
+    "typecheck": "tsc --noEmit -p apps/api/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json",
+    "test": "node --import tsx --test tests/*.test.ts", "test:e2e": "playwright test",
+    "start": "node apps/api/dist/server.mjs", "setup": "tsx scripts/setup.ts",
+    "seed": "tsx scripts/seed.ts", "backup": "tsx scripts/backup.ts",
+    "format": "prettier --write apps packages scripts tests README.md docs/rebuild.md"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0", "@types/node": "^24.3.0", "esbuild": "^0.25.9",
+    "prettier": "^3.6.2", "tsx": "^4.20.5", "typescript": "~5.9.2"
+  }
+}

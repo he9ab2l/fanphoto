@@ -1,0 +1,25 @@
+[Unit]
+Description=Fanphoto temporary HTTPS development ingress
+After=network-online.target fanphoto-dev.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/fanphoto-dev/workspace
+ExecStart=/home/ubuntu/.nvm/versions/node/v24.19.0/bin/node scripts/run-tunnel.mjs
+Restart=always
+RestartSec=15
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/fanphoto-dev/data
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

@@ -11,5 +11,16 @@ __pycache__/
 
 # Node
 node_modules/
-apps/web/dist/
-apps/web/*.log
+dist/
+*.log
+.env
+.env.*
+!.env.example
+.dev.vars
+.wrangler/
+data/
+artifacts/
+playwright-report/
+test-results/
+*.tsbuildinfo
+admin-credentials.txt
