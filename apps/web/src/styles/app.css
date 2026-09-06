@@ -1,4 +1,5 @@
 @charset "UTF-8";
+@import "tailwindcss";
 :root {
   font-family:
     'DM Sans Variable',

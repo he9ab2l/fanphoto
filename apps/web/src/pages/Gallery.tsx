@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUpRight, Grid2X2, Move, Search, SlidersHorizontal, Spar
 import { usePhotos, useSite } from '../lib/api'
 import { PhotoCard } from '../components/PhotoCard'
 import { Empty, ErrorState, IconButton, Spinner } from '../components/ui'
+import { Button } from '../components/ui-kit'
 
 export default function Gallery() {
   const [search, setSearch] = useSearchParams()
@@ -82,7 +83,7 @@ export default function Gallery() {
           <IconButton label={compact ? '舒适布局' : '紧凑布局'} onClick={() => setCompact(!compact)} aria-pressed={compact}><SlidersHorizontal size={17} /></IconButton>
         </div>
       </div>
-      {result.isPending ? <div className="photo-grid skeleton-grid">{Array.from({ length: 8 }, (_, i) => <div key={i} className="skeleton" style={{ height: 260 + (i % 3) * 90 }} />)}</div> : result.isError && !photos.length ? <ErrorState error={result.error} retry={() => void result.refetch()} /> : !photos.length ? <Empty title={q || tag || featured ? '没有找到照片' : '还没有照片'} action={<Link className="button primary" to="/admin">上传第一张 <ArrowUpRight size={15} /></Link>} /> : <div className={`photo-grid ${compact ? 'compact' : ''}`}>{photos.map((photo, index) => <PhotoCard key={photo.id} photo={photo} index={index} />)}</div>}
+      {result.isPending ? <div className="photo-grid skeleton-grid">{Array.from({ length: 8 }, (_, i) => <div key={i} className="skeleton" style={{ height: 260 + (i % 3) * 90 }} />)}</div> : result.isError && !photos.length ? <ErrorState error={result.error} retry={() => void result.refetch()} /> : !photos.length ? <Empty title={q || tag || featured ? '没有找到照片' : '还没有照片'} action={<Button asChild size="lg"><Link to="/admin">上传第一张 <ArrowUpRight size={15} /></Link></Button>} /> : <div className={`photo-grid ${compact ? 'compact' : ''}`}>{photos.map((photo, index) => <PhotoCard key={photo.id} photo={photo} index={index} />)}</div>}
       <div className="load-more" ref={sentinel}>{result.hasNextPage ? <button className="button outline" disabled={result.isFetchingNextPage} onClick={() => void result.fetchNextPage()}>{result.isFetchingNextPage ? <Spinner /> : <>{result.isFetchNextPageError ? '重试加载' : '继续看'} <ArrowDown size={15} /></>}</button> : photos.length > 0 && <span className="end-mark">END OF ROLL</span>}</div>
       <div className="archive-footer-note"><span>FANPHOTO / PRIVATE COLLECTION</span><Link to="/wall">进入照片墙 <Move size={14} /></Link></div>
     </section>
