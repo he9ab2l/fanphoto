@@ -1,4 +1,312 @@
-.gallery {\n  min-height: 100dvh;\n  position: relative;\n}\n.flat-wall {\n  padding: 8px;\n  min-height: 100dvh;\n}\n.photo-grid {\n  position: relative;\n  width: 100%;\n}\n.photo-tile,\n.scene-tile {\n  position: absolute;\n  left: 0;\n  top: 0;\n  padding: 0;\n  min-height: 0;\n  border: 0;\n  border-radius: 5px;\n  background: var(--surface-muted);\n  overflow: hidden;\n  line-height: 0;\n  cursor: pointer;\n}\n.photo-tile {\n  transition: opacity 150ms ease;\n  content-visibility: auto;\n}\n.photo-tile img,\n.scene-tile img {\n  display: block;\n  width: 100%;\n  height: 100%;\n  object-fit: contain;\n  pointer-events: none;\n}\n.photo-tile:active,\n.scene-tile:active {\n  opacity: 0.82;\n}\n.photo-tile:focus-visible,\n.scene-tile:focus-visible {\n  outline: 3px solid #fff;\n  outline-offset: -5px;\n  box-shadow: inset 0 0 0 7px #202020;\n}\n.load-sentinel {\n  height: 100px;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n}\n.gallery-brand {\n  position: fixed;\n  top: max(20px, env(safe-area-inset-top));\n  left: max(22px, env(safe-area-inset-left));\n  z-index: var(--layer-controls);\n}\n.brand-trigger {\n  padding: 0;\n  border: 0;\n  background: none;\n  color: var(--ink);\n  border-radius: 999px;\n  cursor: pointer;\n  font-size: 15px;\n  font-weight: 600;\n}\n.brand-trigger .glass-surface__content {\n  padding: 12px 17px;\n  gap: 10px;\n  min-height: 46px;\n}\n.gallery-dock {\n  position: fixed;\n  bottom: max(24px, env(safe-area-inset-bottom));\n  left: 50%;\n  transform: translateX(-50%);\n  z-index: var(--layer-controls);\n}\n.gallery-dock > .glass-surface__content {\n  gap: 3px;\n  padding: 6px;\n}\n.mode-options {\n  display: flex;\n  align-items: center;\n  gap: 3px;\n}\n.mode-option {\n  min-width: 44px;\n  height: 44px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 7px;\n  border-radius: 999px;\n  padding: 0 12px;\n  cursor: pointer;\n  color: var(--muted);\n}\n.mode-option[data-checked] {\n  color: var(--canvas);\n  background: var(--ink);\n}\n.mode-label {\n  display: none;\n  font-size: 12px;\n  font-weight: 600;\n  white-space: nowrap;\n}\n.mode-option[data-checked] .mode-label {\n  display: block;\n}\n.dock-divider {\n  width: 1px;\n  height: 22px;\n  background: var(--line);\n  margin: 0 4px;\n}\n.gallery-count {\n  position: fixed;\n  right: 26px;\n  bottom: 36px;\n  z-index: var(--layer-controls);\n  font-variant-numeric: tabular-nums;\n  font-size: 12px;\n  color: var(--ink);\n  border: 1px solid var(--glass-border);\n  background: var(--glass);\n  padding: 8px 13px;\n  border-radius: 999px;\n  backdrop-filter: blur(16px);\n}\n.gallery-count span {\n  color: var(--muted);\n  margin-left: 6px;\n}\n.popover-positioner {\n  z-index: var(--layer-popover);\n  outline: none;\n}\n.popover {\n  border-radius: 21px;\n  width: 320px;\n  max-width: calc(100vw - 24px);\n  max-height: min(var(--available-height), calc(100dvh - 100px));\n  overflow: auto;\n  padding: 20px;\n  outline: none;\n  transform-origin: var(--transform-origin);\n  transition:\n    opacity 180ms ease,\n    transform 180ms var(--ease);\n}\n.popover[data-starting-style],\n.popover[data-ending-style] {\n  opacity: 0;\n  transform: translateY(5px) scale(0.98);\n}\n.popover h2 {\n  font-size: 15px;\n  font-weight: 600;\n}\n.popover-heading {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  margin: -5px -5px 2px 0;\n}\n.popover-heading button {\n  font-size: 12px;\n  color: var(--muted);\n}\n.filter-panel {\n  display: grid;\n  gap: 17px;\n}\n.search-input {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  min-height: 44px;\n  background: var(--surface-muted);\n  border-radius: 11px;\n  padding: 0 12px;\n  color: var(--muted);\n}\n.search-input input {\n  width: 100%;\n  min-width: 0;\n  height: 44px;\n  border: 0;\n  padding: 0;\n  background: transparent;\n  color: var(--ink);\n  font-size: 14px;\n}\n.favorite-filter {\n  justify-content: flex-start;\n  padding-left: 0;\n}\n.favorite-filter[aria-pressed='true'] {\n  font-weight: 700;\n}\n.favorite-filter[aria-pressed='true'] svg {\n  fill: var(--ink);\n}\n.filter-result {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  color: var(--muted);\n  font-size: 12px;\n}\n.appearance-panel {\n  width: 298px;\n}\n.brand-menu {\n  width: 275px;\n}\n.brand-menu > p {\n  color: var(--muted);\n  font-size: 13px;\n  line-height: 1.8;\n  margin: 9px 0 20px;\n}\n.menu-link {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  border-radius: 11px;\n  min-height: 46px;\n  padding: 0 12px;\n  font-size: 14px;\n}\n.menu-link svg:last-child {\n  margin-left: auto;\n}\n.gallery-pending,\n.gallery-empty {\n  position: absolute;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n}\n.gallery-empty {\n  width: min(410px, calc(100vw - 40px));\n  border-radius: 24px;\n}\n.immersive-container,\n.immersive-wall,\n.immersive-stage {\n  position: fixed;\n  inset: 0;\n  width: 100%;\n  height: 100dvh;\n  overflow: hidden;\n}\n.immersive-wall {\n  touch-action: none;\n  user-select: none;\n  -webkit-user-select: none;\n  cursor: grab;\n}\n.immersive-wall:active {\n  cursor: grabbing;\n}\n.immersive-wall:focus-visible {\n  outline-offset: -4px;\n}\n.immersive-stage {\n  perspective-origin: 50% 50%;\n  contain: layout paint size;\n}\n.scene-tile {\n  transform-style: preserve-3d;\n  backface-visibility: hidden;\n  transition: opacity 140ms ease;\n}\n.scene-tile:active {\n  transform: none;\n}\n.scene-tile img {\n  backface-visibility: hidden;\n}\n.explore-hint {\n  position: absolute;\n  left: 26px;\n  bottom: 36px;\n  padding: 8px 13px;\n  border-radius: 999px;\n  font-size: 12px;\n  color: var(--muted);\n  background: var(--glass);\n  pointer-events: none;\n}\n.scene-error {\n  position: fixed;\n  top: 22px;\n  right: 22px;\n  border-radius: 15px;\n  z-index: var(--layer-controls);\n}\n\n.detail-shell {
+.gallery {
+  min-height: 100dvh;
+  position: relative;
+}
+.flat-wall {
+  padding: 8px;
+  min-height: 100dvh;
+}
+.photo-grid {
+  position: relative;
+  width: 100%;
+}
+.photo-tile,
+.scene-tile {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 5px;
+  background: var(--surface-muted);
+  overflow: hidden;
+  line-height: 0;
+  cursor: pointer;
+}
+.photo-tile {
+  transition: opacity 150ms ease;
+  content-visibility: auto;
+}
+.photo-tile img,
+.scene-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.photo-tile:active,
+.scene-tile:active {
+  opacity: 0.82;
+}
+.photo-tile:focus-visible,
+.scene-tile:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: -5px;
+  box-shadow: inset 0 0 0 7px #202020;
+}
+.load-sentinel {
+  height: 100px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.gallery-brand {
+  position: fixed;
+  top: max(20px, env(safe-area-inset-top));
+  left: max(22px, env(safe-area-inset-left));
+  z-index: var(--layer-controls);
+}
+.brand-trigger {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+}
+.brand-trigger .glass-surface__content {
+  padding: 12px 17px;
+  gap: 10px;
+  min-height: 46px;
+}
+.gallery-dock {
+  position: fixed;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--layer-controls);
+}
+.gallery-dock > .glass-surface__content {
+  gap: 3px;
+  padding: 6px;
+}
+.mode-options {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.mode-option {
+  min-width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 999px;
+  padding: 0 12px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.mode-option[data-checked] {
+  color: var(--canvas);
+  background: var(--ink);
+}
+.mode-label {
+  display: none;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mode-option[data-checked] .mode-label {
+  display: block;
+}
+.dock-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--line);
+  margin: 0 4px;
+}
+.gallery-count {
+  position: fixed;
+  right: 26px;
+  bottom: 36px;
+  z-index: var(--layer-controls);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--ink);
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  padding: 8px 13px;
+  border-radius: 999px;
+  backdrop-filter: blur(16px);
+}
+.gallery-count span {
+  color: var(--muted);
+  margin-left: 6px;
+}
+.popover-positioner {
+  z-index: var(--layer-popover);
+  outline: none;
+}
+.popover {
+  border-radius: 21px;
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  max-height: min(var(--available-height), calc(100dvh - 100px));
+  overflow: auto;
+  padding: 20px;
+  outline: none;
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity 180ms ease,
+    transform 180ms var(--ease);
+}
+.popover[data-starting-style],
+.popover[data-ending-style] {
+  opacity: 0;
+  transform: translateY(5px) scale(0.98);
+}
+.popover h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.popover-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -5px -5px 2px 0;
+}
+.popover-heading button {
+  font-size: 12px;
+  color: var(--muted);
+}
+.filter-panel {
+  display: grid;
+  gap: 17px;
+}
+.search-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  background: var(--surface-muted);
+  border-radius: 11px;
+  padding: 0 12px;
+  color: var(--muted);
+}
+.search-input input {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+}
+.favorite-filter {
+  justify-content: flex-start;
+  padding-left: 0;
+}
+.favorite-filter[aria-pressed='true'] {
+  font-weight: 700;
+}
+.favorite-filter[aria-pressed='true'] svg {
+  fill: var(--ink);
+}
+.filter-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.appearance-panel {
+  width: 298px;
+}
+.brand-menu {
+  width: 275px;
+}
+.brand-menu > p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+  margin: 9px 0 20px;
+}
+.menu-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 11px;
+  min-height: 46px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+.menu-link svg:last-child {
+  margin-left: auto;
+}
+.gallery-pending,
+.gallery-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.gallery-empty {
+  width: min(410px, calc(100vw - 40px));
+  border-radius: 24px;
+}
+.immersive-container,
+.immersive-wall,
+.immersive-stage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+.immersive-wall {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+.immersive-wall:active {
+  cursor: grabbing;
+}
+.immersive-wall:focus-visible {
+  outline-offset: -4px;
+}
+.immersive-stage {
+  perspective-origin: 50% 50%;
+  contain: layout paint size;
+}
+.scene-tile {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  transition: opacity 140ms ease;
+}
+.scene-tile:active {
+  transform: none;
+}
+.scene-tile img {
+  backface-visibility: hidden;
+}
+.explore-hint {
+  position: absolute;
+  left: 26px;
+  bottom: 36px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--glass);
+  pointer-events: none;
+}
+.scene-error {
+  position: fixed;
+  top: 22px;
+  right: 22px;
+  border-radius: 15px;
+  z-index: var(--layer-controls);
+}
+
+.detail-shell {
   position: fixed;
   top: 50%;
   left: 50%;
