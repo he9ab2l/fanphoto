@@ -1,33 +1,48 @@
 import { test, expect, type Page } from '@playwright/test'
 
 async function centeredTile(page: Page) {
-  const index = await page.locator('.scene-tile').evaluateAll((elements) => {
-    let best = -1,
-      distance = Infinity
-    elements.forEach((element, index) => {
-      const rect = element.getBoundingClientRect()
-      if (
-        getComputedStyle(element).visibility !== 'visible' ||
-        rect.width < 40 ||
-        rect.x < 0 ||
-        rect.y < 75 ||
-        rect.right > innerWidth ||
-        rect.bottom > innerHeight - 95
-      )
-        return
-      const next = Math.hypot(
-        rect.x + rect.width / 2 - innerWidth / 2,
-        rect.y + rect.height / 2 - innerHeight / 2,
-      )
-      if (next < distance) {
-        distance = next
-        best = index
-      }
+  // Tile layout settles asynchronously after entering a curved mode.
+  let target: { index: number; px: number; py: number } | null = null
+  for (let attempt = 0; attempt < 50 && !target; attempt++) {
+    target = await page.locator('.scene-tile').evaluateAll((elements) => {
+      let best: { index: number; px: number; py: number } | null = null
+      let bestOverlap = 0
+      const vw = innerWidth
+      const vh = innerHeight
+      elements.forEach((element, index) => {
+        const rect = element.getBoundingClientRect()
+        if (
+          getComputedStyle(element).visibility !== 'visible' ||
+          rect.width < 40 ||
+          rect.height < 40
+        )
+          return
+        const left = Math.max(rect.x, 0)
+        const top = Math.max(rect.y, 75)
+        const right = Math.min(rect.right, vw)
+        const bottom = Math.min(rect.bottom, vh - 95)
+        const overlapW = right - left
+        const overlapH = bottom - top
+        if (overlapW < 40 || overlapH < 40) return
+        const overlap = overlapW * overlapH
+        if (overlap > bestOverlap) {
+          bestOverlap = overlap
+          best = {
+            index,
+            px: (left + right) / 2 - rect.x,
+            py: (top + bottom) / 2 - rect.y,
+          }
+        }
+      })
+      return best
     })
-    return best
-  })
-  expect(index).toBeGreaterThanOrEqual(0)
-  return page.locator('.scene-tile').nth(index)
+    if (!target) await page.waitForTimeout(200)
+  }
+  expect(target).not.toBeNull()
+  return {
+    tile: page.locator('.scene-tile').nth(target!.index),
+    point: { x: target!.px, y: target!.py },
+  }
 }
 test('natural proportions, panorama spans and real next-page loading', async ({ page }) => {
   const pages: string[] = []
@@ -74,7 +89,7 @@ test('three wall modes, dragging, wheel looping, detail background and collapse'
     await page.getByRole('radio', { name: label, exact: true }).click()
     await expect(page.locator('.gallery')).toHaveAttribute('data-view-mode', mode)
     await expect(page.getByTestId('immersive-wall')).toBeVisible()
-    const tile = await centeredTile(page)
+    const { tile } = await centeredTile(page)
     const before = await tile.getAttribute('style')
     const viewport = page.viewportSize()!
     await page.mouse.move(viewport.width / 2, viewport.height / 2)
@@ -87,9 +102,14 @@ test('three wall modes, dragging, wheel looping, detail background and collapse'
       .poll(async () => page.locator('.scene-tile[aria-hidden="false"]').count())
       .toBeGreaterThan(3)
   }
-  const target = await centeredTile(page)
-  if (info.project.name === 'mobile') await target.tap()
-  else await target.click()
+  // Wheel exploration may leave the camera facing empty sky; return to a
+  // pointable wall pose before opening the detail overlay.
+  await page.goto('/')
+  await page.getByRole('radio', { name: '球面模式', exact: true }).click()
+  await expect(page.getByTestId('immersive-wall')).toBeVisible()
+  const { tile: target, point } = await centeredTile(page)
+  if (info.project.name === 'mobile') await target.tap({ position: point })
+  else await target.click({ position: point })
   await expect(page.getByTestId('photo-detail')).toBeVisible()
   await expect(page.getByRole('complementary', { name: '照片元数据' })).toBeVisible()
   await expect(page.getByText('Synthetic Camera', { exact: true })).toBeVisible()
@@ -163,8 +183,8 @@ test('reduced motion keeps all modes usable; mobile touch pans the surface', asy
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/?view=sphere')
   await expect(page.getByTestId('immersive-wall')).toBeVisible()
-  const tile = await centeredTile(page),
-    before = await tile.getAttribute('style')
+  const { tile } = await centeredTile(page)
+  const before = await tile.getAttribute('style')
   if (info.project.name === 'mobile') {
     const session = await page.context().newCDPSession(page)
     const x = 190,
