@@ -135,7 +135,9 @@ export default function PhotoDialog() {
     const displayH = Math.min(stageWidth / ratio, maxStageHeight)
     return { w: displayH * ratio, h: displayH }
   }, [photo, stageWidth, maxStageHeight])
-  const shellHeight = fit ? Math.round(fit.h + SHELL_PAD_Y * 2) : 560
+  const shellHeight = fit
+    ? Math.max(320, Math.min(Math.round(fit.h + SHELL_PAD_Y * 2), viewport.h - SHELL_MARGIN_Y))
+    : 560
   /** 手机底部面板：拖 grip 上滑展开 / 下滑收起，松手按位移与速度投影目标档位 */
   const gripState = useRef({ y: 0, t: 0, vy: 0, active: false })
   const [gripY, setGripY] = useState(0)
