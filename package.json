@@ -12,7 +12,6 @@
     "build": "pnpm typecheck && pnpm --filter @fanphoto/client build && node scripts/build-server.mjs",
     "typecheck": "tsc -p apps/server/tsconfig.json && tsc -p apps/client/tsconfig.json",
     "test": "node --import tsx --test tests/*.test.ts",
-    "test:e2e": "playwright test",
     "start": "node apps/server/dist/server.mjs",
     "setup": "tsx scripts/setup.ts",
     "photos:import": "tsx scripts/import.ts",
@@ -22,7 +21,6 @@
   "devDependencies": {
     "@fanphoto/contracts": "workspace:*",
     "sharp": "0.35.4",
-    "@playwright/test": "1.63.0",
     "@types/node": "^24.3.0",
     "esbuild": "^0.25.9",
     "prettier": "^3.6.2",
