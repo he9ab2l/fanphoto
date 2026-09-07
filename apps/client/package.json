@@ -1,0 +1,31 @@
+{
+  "name": "@fanphoto/client",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@fanphoto/contracts": "workspace:*",
+    "@base-ui/react": "1.8.0",
+    "@mingcute/react": "3.0.2",
+    "@tanstack/react-query": "^5.90.2",
+    "@use-gesture/react": "^10.3.1",
+    "clsx": "^2.1.1",
+    "motion": "^12.23.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.1",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "vite": "^7.2.2"
+  }
+}

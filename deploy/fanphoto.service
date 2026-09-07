@@ -1,0 +1,34 @@
+[Unit]
+Description=FanPhoto 2 photo library
+After=network.target
+ConditionPathExists=/home/ubuntu/fanphoto-next/current/apps/server/dist/server.mjs
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/fanphoto-next/current
+EnvironmentFile=/home/ubuntu/fanphoto-next/.env
+Environment=FANPHOTO_ROOT=/home/ubuntu/fanphoto-next/current
+Environment=FANPHOTO_ENV_FILE=/home/ubuntu/fanphoto-next/.env
+Environment=NODE_ENV=production
+Environment=TRUST_LOCAL_PROXY=true
+ExecStart=/home/ubuntu/.nvm/versions/node/v24.19.0/bin/node apps/server/dist/server.mjs
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=120
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/fanphoto-next/data
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=1G
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target

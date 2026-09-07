@@ -10,6 +10,7 @@ export default defineConfig({
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
     baseURL: 'http://127.0.0.1:8791',
+    locale: 'zh-CN',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     launchOptions: {
@@ -28,8 +29,8 @@ export default defineConfig({
   ],
   webServer: {
     command: 'pnpm exec tsx tests/start-server.ts',
-    url: 'http://127.0.0.1:8791/api/health',
+    url: 'http://127.0.0.1:8791/api/v1/health',
     reuseExistingServer: false,
-    timeout: 60_000,
+    timeout: 120_000,
   },
 })

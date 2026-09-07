@@ -1,51 +1,66 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { sanitizeVideo, webpSize } from '../apps/api/src/images'
-import { cleanCanvasWebp } from '../packages/shared/src/webp'
-const atom = (type: string, value: Uint8Array) => {
-  const bytes = new Uint8Array(8 + value.length)
-  new DataView(bytes.buffer).setUint32(0, bytes.length)
-  bytes.set(new TextEncoder().encode(type), 4)
-  bytes.set(value, 8)
-  return bytes
-}
-test('browser ICC/EXIF chunks are removed while retaining a decodable WebP frame', () => {
-  const frame = new Uint8Array(Buffer.from('UklGRiIAAABXRUJQVlA4TBYAAAAvB0ABAAdQy5IVuf8BgCD8b5uI6H8I', 'base64'))
-  const chunk = (type: string, body: Uint8Array) => { const bytes = new Uint8Array(8 + body.length + body.length % 2); bytes.set(new TextEncoder().encode(type)); new DataView(bytes.buffer).setUint32(4, body.length, true); bytes.set(body, 8); return bytes }
-  const extended = new Uint8Array([0x28, 0, 0, 0, 7, 0, 0, 5, 0, 0])
-  const parts = [chunk('VP8X', extended), chunk('ICCP', new TextEncoder().encode('profile')), chunk('EXIF', new TextEncoder().encode('private gps')), frame.slice(12)]
-  const input = new Uint8Array(12 + parts.reduce((n, part) => n + part.length, 0)); input.set(frame.slice(0, 12)); new DataView(input.buffer).setUint32(4, input.length - 8, true)
-  let offset = 12; for (const part of parts) { input.set(part, offset); offset += part.length }
-  assert.throws(() => webpSize(input.buffer))
-  const output = cleanCanvasWebp(input.buffer)
-  assert.deepEqual(webpSize(output), { width: 8, height: 6 })
-  assert.ok(!new TextDecoder().decode(output).includes('private gps'))
-  assert.equal(new Uint8Array(output)[20], 0)
+import sharp from 'sharp'
+import { fixture } from './helpers'
+import { processSource } from '../apps/server/src/modules/media/processor'
+import { captureDate } from '../apps/server/src/modules/media/metadata'
+import { FileStore } from '../apps/server/src/core/storage'
+
+test('EXIF orientation becomes natural image dimensions and is removed from public derivatives', async () => {
+  const photo = await processSource(await fixture(1200, 800, 6))
+  assert.equal(photo.width, 800)
+  assert.equal(photo.height, 1200)
+  assert.equal(photo.source.width, 800)
+  assert.equal(photo.source.height, 1200)
+  for (const asset of photo.assets) {
+    const metadata = await sharp(asset.data).metadata()
+    assert.equal(metadata.exif, undefined)
+    assert.equal(metadata.orientation, undefined)
+    assert.ok(Math.abs(asset.width / asset.height - 2 / 3) < 0.003)
+  }
 })
-test('Live Photo metadata is scrubbed without changing media offsets', () => {
-  const ftyp = atom('ftyp', new TextEncoder().encode('isom0000isom0000')),
-    secret = new TextEncoder().encode('GPS SECRET +35.123+110.456'),
-    moov = atom('moov', atom('udta', secret)),
-    mdat = atom('mdat', new Uint8Array([1, 2, 3, 4]))
-  const input = new Uint8Array(ftyp.length + moov.length + mdat.length)
-  input.set(ftyp)
-  input.set(moov, ftyp.length)
-  input.set(mdat, ftyp.length + moov.length)
-  const output = sanitizeVideo(input.buffer)
-  assert.equal(output.byteLength, input.byteLength)
-  assert.ok(!new TextDecoder().decode(output).includes('SECRET'))
-  assert.deepEqual(new Uint8Array(output).slice(-4), new Uint8Array([1, 2, 3, 4]))
+test('PNG transparency, TIFF, WebP and AVIF decode into proportional clean variants', async () => {
+  for (const format of ['png', 'tiff', 'webp', 'avif'] as const) {
+    const bytes = await sharp({
+      create: {
+        width: 360,
+        height: 240,
+        channels: 4,
+        background: { r: 120, g: 100, b: 80, alpha: 0.4 },
+      },
+    })
+      .toFormat(format)
+      .toBuffer()
+    const result = await processSource(bytes)
+    assert.equal(result.width, 360)
+    assert.equal(result.height, 240)
+    assert.equal(result.assets.length, 4)
+    assert.equal(result.analysis.histogram.length, 64)
+    assert.ok(result.thumbHash.length > 10)
+    if (format === 'png')
+      assert.equal((await sharp(result.assets[0].data).metadata()).hasAlpha, true)
+  }
 })
-test('truncated video atoms and appended WebP payloads are rejected', () => {
-  assert.throws(() =>
-    sanitizeVideo(atom('ftyp', new TextEncoder().encode('isom0000isom0000')).buffer.slice(0, 15)),
+test('capture dates preserve unknown timezone instead of inventing camera facts', () => {
+  assert.deepEqual(captureDate('not recorded', null), {
+    takenAt: null,
+    capturedLocal: null,
+    capturedOffset: null,
+  })
+  assert.equal(captureDate('2024:05:06 07:08:09', null).capturedOffset, null)
+  assert.equal(captureDate('2024:02:31 07:08:09', null).capturedLocal, null)
+  assert.equal(
+    captureDate('2024:05:06 07:08:09', '+08:00').takenAt,
+    Date.parse('2024-05-05T23:08:09Z'),
   )
-  const valid = new Uint8Array(
-    Buffer.from('UklGRiIAAABXRUJQVlA4TBYAAAAvB0ABAAdQy5IVuf8BgCD8b5uI6H8I', 'base64'),
-  )
-  assert.deepEqual(webpSize(valid.buffer), { width: 8, height: 6 })
-  const invalid = new Uint8Array(valid.length + 4)
-  invalid.set(valid)
-  invalid.set([1, 2, 3, 4], valid.length)
-  assert.throws(() => webpSize(invalid.buffer))
+})
+test('storage rejects traversal, arbitrary variants and user filenames', () => {
+  const store = new FileStore('/tmp/fanphoto-storage-guard-only')
+  for (const key of [
+    '../secret',
+    '/etc/passwd',
+    `${crypto.randomUUID()}/../../secret`,
+    `${crypto.randomUUID()}/evil.svg`,
+  ])
+    assert.throws(() => store.path(key))
 })
