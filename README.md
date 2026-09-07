@@ -22,7 +22,7 @@ apps/server/         Node + Hono；core / modules；SQLite 迁移
 packages/contracts/  Zod 请求契约和 TypeScript 响应类型
 scripts/             初始化、构建、原片导入、备份
 deploy/              systemd、原子发布、旧站归档、定向 Caddy 配置替换
-tests/               API、媒体、几何、部署配置与浏览器测试
+tests/               API、媒体、几何与部署配置单元测试
 tools/               真风景图下载、原片核验、截图取证
 docs/                架构、接口、运维、资源来源与验收
 ```
@@ -30,7 +30,7 @@ docs/                架构、接口、运维、资源来源与验收
 ## 本地开发
 
 完整后端推荐 Linux / macOS + Node 24 LTS、pnpm 9。当前 Termux 可进行前端构建和类型检查；
-Sharp 原生解码与浏览器测试在 ten 的独立工作目录验证。
+Sharp 原生解码单元测试在 ten 的独立工作目录验证；UI 在测试站人工核验。
 
 ```bash
 pnpm install
@@ -40,7 +40,6 @@ pnpm photos:import --directory test-photo/commons-landscapes
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm test:e2e                     # 必须先构建；独立临时数据库，不操作真实图库
 pnpm start
 ```
 

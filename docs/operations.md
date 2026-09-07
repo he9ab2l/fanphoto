@@ -46,16 +46,14 @@ pnpm photos:import --directory test-photo/commons-landscapes
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm exec playwright install chromium
-pnpm test:e2e
+# UI 验收：人工在测试站核对（浏览器自动化已移除，见 CLAUDE.md）
 ```
 
 不能用 `pnpm import` 代替 `photos:import`，前者是 pnpm 自己的锁文件命令。
 目录有 manifest.json 时同时读来源 / 许可 / 原片校验和；否则导入该目录中的支持格式。
 处理服务和 Web 上传完全复用，重复导入按源 SHA256 去重。
 
-浏览器测试通过 `tests/start-server.ts` 创建 `fanphoto-browser-*` 临时库与确定性合成素材，
-不操作测试域名上的真实风景图库。截图验收另使用真实图库：
+截图 / 行为验收使用真实图库：
 
 ```bash
 FANPHOTO_ENV_FILE=/home/ubuntu/fanphoto-next/.env pnpm exec tsx tools/audit-photos.ts
@@ -74,7 +72,7 @@ node tools/capture-ui.mjs
 1. 检查旧 service 的 WorkingDirectory / PID、8787 监听、Caddy 分支、容器列表和 nginx 是否存在。
 2. 新工作目录为 `/home/ubuntu/fanphoto-next/workspace`。同步排除 .git、node_modules、数据、密码、
    大原片及本地构建；在服务器用固定锁文件安装和构建。
-3. 先完成类型 / API / 几何 / 浏览器 / 真原片验证。
+3. 先完成类型 / API / 几何 / 真原片验证；UI 在测试站人工核验。
 4. `bash deploy/cleanup-legacy.sh`：验证精确目标、保存共享配置与服务清单、停止旧服务、
    归档整个旧部署、移走旧 unit；定向替换 Caddy 分支。其他 Caddy 文本逐字校验保持不变，
    其他运行容器 ID / 镜像 / 状态前后比较。
