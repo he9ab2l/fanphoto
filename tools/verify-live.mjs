@@ -27,8 +27,8 @@ for (const path of ['/', '/studio', '/favicon.svg']) {
 }
 report.securityHeaders = true
 const catalog = await (await request('/api/v1/photos?limit=80')).json()
-assert.equal(catalog.page.total, 32)
-assert.equal(catalog.items.length, 32)
+assert.equal(catalog.page.total, 70)
+assert.equal(catalog.items.length, 70)
 const urls = catalog.items.flatMap((photo) => Object.values(photo.assets).map((asset) => asset.url))
 let verified = 0
 const pending = [...urls]
@@ -43,7 +43,7 @@ await Promise.all(Array.from({ length: 4 }, async () => {
     verified++
   }
 }))
-report.publicPhotos = 32
+report.publicPhotos = 70
 report.verifiedPublicVariants = verified
 const login = await request('/api/v1/session', {
   method: 'POST', headers: { 'content-type': 'application/json', origin },
@@ -103,7 +103,7 @@ try {
   }
   await request('/api/v1/session', { method: 'DELETE', headers })
 }
-assert.equal((await (await request('/api/v1/photos?limit=1')).json()).page.total, 32)
+assert.equal((await (await request('/api/v1/photos?limit=1')).json()).page.total, 70)
 await mkdir('artifacts/live-verification', { recursive: true })
 await writeFile(resolve('artifacts/live-verification/report.json'), JSON.stringify(report, null, 2))
 console.log(JSON.stringify(report, null, 2))

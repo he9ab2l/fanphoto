@@ -15,7 +15,7 @@ const exec = promisify(execFile)
 const directory = resolve('test-photo/commons-landscapes')
 const cachePath = resolve(directory, 'catalog.json')
 const manifestPath = resolve(directory, 'manifest.json')
-const quotas = { landscape: 12, portrait: 8, square: 6, panorama: 6 }
+const quotas = { landscape: 26, portrait: 14, square: 12, panorama: 18 }
 const agent =
   'FanPhoto-TestGallery/2.0 (personal open-source photo gallery; Wikimedia Commons attribution preserved)'
 
@@ -212,62 +212,85 @@ if (catalog.filter((p) => p.group === 'square').length < quotas.square * 2) {
 }
 
 const selected = []
+// Incremental: keep already-downloaded originals and only fetch missing quota.
+let downloaded = new Set()
+try {
+  const existingManifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  downloaded = new Set(existingManifest.photos.map((photo) => photo.commonsId))
+  selected.push(...existingManifest.photos)
+} catch {}
 // Curated scenery titles, not the birds/product shots that full-text "landscape"
 // searches can also return. Their unmodified originals still need byte checks.
 const squareScenery = [
   163913490, 74740142, 30697623, 105247326, 122593232, 195972085, 195972087, 84886509, 85063306,
   148879898, 148879900, 171380820,
 ]
-const portraitScenery = [
-  75073786, 75073785, 40579931, 169013970, 171870110, 139570600, 73750624, 84482623,
-]
-for (const [bucket, quota] of Object.entries(quotas)) {
-  const options = catalog
-    .filter(
-      (p) =>
-        p.group === bucket &&
-        (bucket !== 'square' || squareScenery.includes(p.commonsId)) &&
-        (bucket !== 'portrait' || portraitScenery.includes(p.commonsId)),
-    )
+const groupOptions = (bucket) =>
+  catalog
+    .filter((p) => p.group === bucket && !downloaded.has(p.commonsId))
     .sort((a, b) =>
       bucket === 'square'
-        ? squareScenery.indexOf(a.commonsId) - squareScenery.indexOf(b.commonsId)
-        : bucket === 'portrait'
-          ? portraitScenery.indexOf(a.commonsId) - portraitScenery.indexOf(b.commonsId)
-          : b.score - a.score || a.bytes - b.bytes,
+        ? (() => {
+            const ia = squareScenery.indexOf(a.commonsId)
+            const ib = squareScenery.indexOf(b.commonsId)
+            if (ia !== -1 && ib !== -1) return ia - ib
+            if (ia !== -1) return -1
+            if (ib !== -1) return 1
+            return b.score - a.score || a.bytes - b.bytes
+          })()
+        : b.score - a.score || a.bytes - b.bytes,
     )
+for (const [bucket, quota] of Object.entries(quotas)) {
+  const wanted = quota - selected.filter((p) => p.group === bucket).length
+  const options = groupOptions(bucket)
   let count = 0
   const authors = new Map()
   for (const item of options) {
-    if (count >= quota) break
+    if (count >= wanted) break
+    // Older albums may repeat an author; cap each author across a bucket.
     if (bucket !== 'square' && (authors.get(item.author) || 0) >= 3) continue
     const target = resolve(directory, item.file)
     try {
+      await new Promise((resolve) => setTimeout(resolve, 2000))
       const existing = await stat(target).catch(() => null)
       if (existing?.size !== item.bytes) {
         const temporary = `${target}.part`
-        await exec(
-          'curl',
-          [
-            '-fLsS',
-            '--max-time',
-            '90',
-            '--retry',
-            '1',
-            '--retry-delay',
-            '3',
-            '--retry-max-time',
-            '120',
-            '-A',
-            agent,
-            item.url,
-            '-o',
-            temporary,
-          ],
-          { maxBuffer: 1024 * 1024, timeout: 150_000 },
-        )
-        const size = (await stat(temporary)).size
-        if (size !== item.bytes) throw new Error(`Original size mismatch: ${size} != ${item.bytes}`)
+        let fetched = false
+        let lastError = ''
+        for (let attempt = 0; attempt < 6 && !fetched; attempt++) {
+          try {
+            // No --retry: on this environment curl's retry path swallows the
+            // exit code (429 fails with exit 0 and no file), so let each HTTP
+            // failure surface as a non-zero exit and back off here instead.
+            await exec(
+              'curl',
+              [
+                '-fLsS',
+                '--max-time',
+                '90',
+                '-A',
+                agent,
+                item.url,
+                '-o',
+                temporary,
+              ],
+              { maxBuffer: 1024 * 1024, timeout: 120_000 },
+            )
+            const size = (await stat(temporary)).size
+            if (size !== item.bytes) throw new Error(`Original size mismatch: ${size} != ${item.bytes}`)
+            fetched = true
+          } catch (error) {
+            const message = String(error?.message || error)
+            if (!/429|too many|retry later|temporarily|ENOENT/i.test(message)) throw error
+            lastError = message
+            const wait = 20 * 2 ** attempt + Math.floor(Math.random() * 10)
+            console.error(
+              `Rate limited/transient (${message.slice(0, 60)}), retrying ${item.commonsId} in ${wait}s (attempt ${attempt + 1}/6)`,
+            )
+            await new Promise((resolve) => setTimeout(resolve, wait * 1000))
+          }
+        }
+        if (!fetched) throw new Error(`Download failed after retries: ${lastError}`)
         await rename(temporary, target)
       }
       const bytes = await readFile(target)
@@ -292,13 +315,13 @@ for (const [bucket, quota] of Object.entries(quotas)) {
         ),
       )
       console.log(
-        `Downloaded ${bucket} ${count}/${quota}: ${item.title} (${item.width}×${item.height}, EXIF ${item.metadataFields.length})`,
+        `Downloaded ${bucket} ${count}/${wanted}: ${item.title} (${item.width}×${item.height}, EXIF ${item.metadataFields.length})`,
       )
     } catch (error) {
       console.error(`Skipped ${item.commonsId}: ${error.message}`)
     }
   }
-  if (count < quota) console.error(`Missing ${bucket}: ${count}/${quota}`)
+  if (count < wanted) console.error(`Missing ${bucket}: ${count}/${wanted}`)
 }
 
 const counts = Object.fromEntries(

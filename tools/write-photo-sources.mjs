@@ -24,7 +24,7 @@ await writeFile(
     ...rows,
     '',
     `共 ${manifest.photos.length} 张。原片总量 ${(manifest.photos.reduce((sum, photo) => sum + photo.bytes, 0) / 1024 ** 2).toFixed(1)} MiB。`,
-    '完整证据：test-photo/commons-landscapes/manifest.json；服务端处理复核：artifacts/photo-audit/report.json。',
+    '完整证据：docs/photo-manifest.json（SHA256 / 来源 / 许可 / EXIF 类型清单）；服务端处理复核：ten 服务器 workspace/artifacts/photo-audit/report.json。',
     '',
   ].join('\n'),
 )
