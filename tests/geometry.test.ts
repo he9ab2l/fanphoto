@@ -1,6 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { masonry, project, sceneTiles, modulo, DEFAULT_JUSTIFY_OPTIONS } from '../apps/client/src/gallery/geometry'
+import {
+  masonry,
+  project,
+  sceneTiles,
+  modulo,
+  DEFAULT_JUSTIFY_OPTIONS,
+} from '../apps/client/src/gallery/geometry'
 import type { PhotoSummary } from '../packages/contracts/src'
 
 const ratios = [1.5, 2 / 3, 1, 4, 8, 0.4]
@@ -99,16 +105,6 @@ const makePhotos = (ratios: number[]): PhotoSummary[] =>
     },
   }))
 
-/** 同一行（y 相等）的 tiles 的右缘。 */
-const rowRightEdges = (tiles: ReturnType<typeof masonry>['tiles']) => {
-  const rows = new Map<number, number>()
-  for (const tile of tiles) {
-    const right = tile.x + tile.width
-    rows.set(tile.y, Math.max(rows.get(tile.y) ?? 0, right))
-  }
-  return [...rows.values()]
-}
-
 test('every row including the last fills the container exactly (rectangular wall)', () => {
   const source = makePhotos(Array(10).fill(1.5))
   for (const density of [1, 2, 3]) {
@@ -117,7 +113,8 @@ test('every row including the last fills the container exactly (rectangular wall
     assert.ok(height > 0)
     const rows = new Map<number, number>()
     for (const tile of tiles) rows.set(tile.y, Math.max(rows.get(tile.y) ?? 0, tile.x + tile.width))
-    for (const [y, right] of rows) assert.ok(Math.abs(right - 1440) < 1e-6, `row ${y} should be flush, got ${right}`)
+    for (const [y, right] of rows)
+      assert.ok(Math.abs(right - 1440) < 1e-6, `row ${y} should be flush, got ${right}`)
   }
 })
 
@@ -125,7 +122,9 @@ test('sparse tail is split into flush rows instead of leaving a hole', () => {
   // 5 张（1.5×4 + 2/3）：整体 390px 宽一行填充，无尾部空缺
   const { tiles } = masonry(makePhotos([1.5, 1.5, 1.5, 1.5, 2 / 3]), 1440, 2)
   const lastY = Math.max(...tiles.map((tile) => tile.y))
-  const lastRight = Math.max(...tiles.filter((tile) => tile.y === lastY).map((tile) => tile.x + tile.width))
+  const lastRight = Math.max(
+    ...tiles.filter((tile) => tile.y === lastY).map((tile) => tile.x + tile.width),
+  )
   assert.ok(Math.abs(lastRight - 1440) < 1e-6, `last row should be flush, got ${lastRight}`)
 })
 
@@ -180,7 +179,8 @@ test('extreme tail still keeps the wall rectangular and never crushes peers', ()
   // 全部行满行宽（底部平齐、整体矩形）
   const rows = new Map<number, number>()
   for (const tile of tiles) rows.set(tile.y, Math.max(rows.get(tile.y) ?? 0, tile.x + tile.width))
-  for (const right of rows.values()) assert.ok(Math.abs(right - 1440) < 1e-6, `row right edge ${right}`)
+  for (const right of rows.values())
+    assert.ok(Math.abs(right - 1440) < 1e-6, `row right edge ${right}`)
 })
 
 test('extreme photo never crushes peers, whether sharing a row or spanning its own', () => {
@@ -191,7 +191,10 @@ test('extreme photo never crushes peers, whether sharing a row or spanning its o
     const ratio = tile.photo.width / tile.photo.height
     assert.ok(Math.abs(tile.width / tile.height - ratio) < 1e-8, 'proportions kept')
     if (ratio < opts.extremeWide && ratio > opts.extremeTall) {
-      assert.ok(tile.width >= opts.soft.min - 1e-6, `peer ${tile.photo.id} crushed to ${tile.width}`)
+      assert.ok(
+        tile.width >= opts.soft.min - 1e-6,
+        `peer ${tile.photo.id} crushed to ${tile.width}`,
+      )
     }
     assert.ok(tile.x + tile.width <= 1440 + 1e-6, 'in bounds')
   }

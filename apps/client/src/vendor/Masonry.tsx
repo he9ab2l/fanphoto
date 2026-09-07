@@ -25,7 +25,10 @@ export function Masonry({
     observer.observe(root.current)
     return () => observer.disconnect()
   }, [])
-  const layout = useMemo(() => masonry(photos, width, density, options), [photos, width, density, options])
+  const layout = useMemo(
+    () => masonry(photos, width, density, options),
+    [photos, width, density, options],
+  )
   return (
     <div
       className="photo-grid"
