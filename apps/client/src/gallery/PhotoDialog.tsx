@@ -32,7 +32,7 @@ export default function PhotoDialog() {
   const isMobile = () => window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
   const [open, setOpen] = useState(true)
   const [mobile, setMobile] = useState(isMobile)
-  const [info, setInfo] = useState<InfoState>('full')
+  const [info, setInfo] = useState<InfoState>(() => (isMobile() ? 'collapsed' : 'full'))
   const [viewport, setViewport] = useState(() => ({
     w: window.innerWidth,
     h: window.innerHeight,
@@ -78,7 +78,8 @@ export default function PhotoDialog() {
     const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`)
     const onChange = (event: MediaQueryListEvent) => {
       setMobile(event.matches)
-      setInfo((value) => (event.matches ? (value === 'collapsed' ? 'partial' : value) : 'full'))
+      // 手机端三种形态都合法，保持现状；桌面端没有 partial，回落到 full
+      setInfo((value) => (event.matches ? value : value === 'partial' ? 'full' : value))
     }
     mq.addEventListener('change', onChange)
     return () => mq.removeEventListener('change', onChange)
@@ -265,20 +266,6 @@ export default function PhotoDialog() {
                     />
                   </div>
                 </div>
-                <div className="detail-corner">
-                  {!mobile && (
-                    <IconButton
-                      icon="panel"
-                      label={expanded ? '收起照片信息' : '展开照片信息'}
-                      aria-expanded={expanded}
-                      aria-controls="photo-information"
-                      onClick={toggleInfo}
-                    />
-                  )}
-                  <Dialog.Close
-                    render={<IconButton ref={closeButton} icon="close" label="关闭照片详情" />}
-                  />
-                </div>
                 <AnimatePresence initial={false}>
                   {infoVisible && (
                     <motion.aside
@@ -346,6 +333,20 @@ export default function PhotoDialog() {
               </>
             )
           )}
+          <div className="detail-corner">
+            {!mobile && (
+              <IconButton
+                icon="panel"
+                label={expanded ? '收起照片信息' : '展开照片信息'}
+                aria-expanded={expanded}
+                aria-controls="photo-information"
+                onClick={toggleInfo}
+              />
+            )}
+            <Dialog.Close
+              render={<IconButton ref={closeButton} icon="close" label="关闭照片详情" />}
+            />
+          </div>
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>
