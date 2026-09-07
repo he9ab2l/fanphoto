@@ -85,8 +85,7 @@ export default function PhotoDialog() {
     return () => mq.removeEventListener('change', onChange)
   }, [])
   useEffect(() => {
-    const onResize = () =>
-      setViewport({ w: window.innerWidth, h: window.innerHeight })
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight })
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
@@ -216,9 +215,7 @@ export default function PhotoDialog() {
                   )}
                   <div
                     className="detail-photo"
-                    style={
-                      mobile ? undefined : { width: fit?.w, height: fit?.h }
-                    }
+                    style={mobile ? undefined : { width: fit?.w, height: fit?.h }}
                   >
                     <motion.img
                       key={photo.id}
@@ -274,9 +271,27 @@ export default function PhotoDialog() {
                       className={`detail-info${info === 'full' ? ' detail-info--full' : ''}`}
                       id="photo-information"
                       aria-label="照片元数据"
-                      initial={reduced ? { opacity: 0 } : mobile ? { opacity: 0, y: 24 } : { opacity: 0, x: 16 }}
-                      animate={reduced ? { opacity: 1 } : mobile ? { opacity: 1, y: 0 } : { opacity: 1, x: 0 }}
-                      exit={reduced ? { opacity: 0 } : mobile ? { opacity: 0, y: 24 } : { opacity: 0, x: 16 }}
+                      initial={
+                        reduced
+                          ? { opacity: 0 }
+                          : mobile
+                            ? { opacity: 0, y: 24 }
+                            : { opacity: 0, x: 16 }
+                      }
+                      animate={
+                        reduced
+                          ? { opacity: 1 }
+                          : mobile
+                            ? { opacity: 1, y: 0 }
+                            : { opacity: 1, x: 0 }
+                      }
+                      exit={
+                        reduced
+                          ? { opacity: 0 }
+                          : mobile
+                            ? { opacity: 0, y: 24 }
+                            : { opacity: 0, x: 16 }
+                      }
                       transition={{ duration: 0.18 }}
                     >
                       <div
@@ -307,11 +322,7 @@ export default function PhotoDialog() {
                           <p className="detail-info-date">{captureLabel(photo)}</p>
                         </div>
                         {mobile && (
-                          <IconButton
-                            icon="down"
-                            label="收起照片信息"
-                            onClick={toggleInfo}
-                          />
+                          <IconButton icon="down" label="收起照片信息" onClick={toggleInfo} />
                         )}
                       </header>
                       {(!mobile || info === 'full') && (
