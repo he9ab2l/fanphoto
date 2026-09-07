@@ -1,17 +1,20 @@
 /** React Bits Masonry adaptation; attribution and license in NOTICE.md. */
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PhotoSummary } from '@fanphoto/contracts'
-import { masonry } from '../gallery/geometry'
+import { masonry, type JustifyOptions } from '../gallery/geometry'
 import { imageSet } from '../lib/photos'
 import { Button } from '../ui/primitives'
 
 export function Masonry({
   photos,
   density,
+  options,
   onOpen,
 }: {
   photos: PhotoSummary[]
   density: number
+  /** 覆盖默认布局参数（用于调试/调参，日常不传） */
+  options?: Partial<JustifyOptions>
   onOpen: (photo: PhotoSummary) => void
 }) {
   const root = useRef<HTMLDivElement>(null)
@@ -22,7 +25,7 @@ export function Masonry({
     observer.observe(root.current)
     return () => observer.disconnect()
   }, [])
-  const layout = useMemo(() => masonry(photos, width, density), [photos, width, density])
+  const layout = useMemo(() => masonry(photos, width, density, options), [photos, width, density, options])
   return (
     <div
       className="photo-grid"
