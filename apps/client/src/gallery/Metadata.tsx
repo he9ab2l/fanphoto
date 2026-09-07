@@ -72,11 +72,20 @@ export function Metadata({ photo }: { photo: Photo }) {
             ['大小', formatBytes(photo.file.bytes)],
             ...(photo.file.name ? [['文件名', photo.file.name] as [string, string]] : []),
             ...(exif.software ? [['软件', exif.software] as [string, string]] : []),
-            ...(exif.artist ? [['作者', exif.artist] as [string, string]] : []),
-            ...(exif.copyright ? [['版权', exif.copyright] as [string, string]] : []),
           ]}
         />
       </section>
+      {(exif.artist || exif.copyright) && (
+        <section>
+          <h3>作者与版权</h3>
+          <Facts
+            rows={[
+              ...(exif.artist ? [['作者', exif.artist] as [string, string]] : []),
+              ...(exif.copyright ? [['版权', exif.copyright] as [string, string]] : []),
+            ]}
+          />
+        </section>
+      )}
       <section>
         <h3>标签</h3>
         {photo.tags.length ? (
