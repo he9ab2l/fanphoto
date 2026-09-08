@@ -49,7 +49,16 @@ export function SVGGlassFilter({
       />
       <feOffset in="b" dx="-1" dy="0" result="b2" />
       <feComposite in="r2" in2="g" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="rg" />
-      <feComposite in="rg" in2="b2" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="rgb" />
+      <feComposite
+        in="rg"
+        in2="b2"
+        operator="arithmetic"
+        k1="0"
+        k2="1"
+        k3="1"
+        k4="0"
+        result="rgb"
+      />
     </>
   ) : null
 

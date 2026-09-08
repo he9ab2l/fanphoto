@@ -16,12 +16,12 @@
 
 ## 技术栈
 
-| 层 | 技术 |
-| --- | --- |
-| 前端 | React 19 · Vite 7 · TypeScript（strict）· Base UI · MingCute · Motion · TanStack Query |
-| 后端 | Node 24 · Hono · node:sqlite（WAL）· sharp · exifr · heic-convert |
-| 契约 | Zod（unique API source of truth，`packages/contracts`） |
-| 工具链 | pnpm 9 workspace · esbuild · node:test（`--import tsx`）· Prettier |
+| 层     | 技术                                                                                   |
+| ------ | -------------------------------------------------------------------------------------- |
+| 前端   | React 19 · Vite 7 · TypeScript（strict）· Base UI · MingCute · Motion · TanStack Query |
+| 后端   | Node 24 · Hono · node:sqlite（WAL）· sharp · exifr · heic-convert                      |
+| 契约   | Zod（unique API source of truth，`packages/contracts`）                                |
+| 工具链 | pnpm 9 workspace · esbuild · node:test（`--import tsx`）· Prettier                     |
 
 全站玻璃为自研 Glass Engine（`apps/client/src/glass/`），见
 [docs/glass-engine-architecture.md](docs/glass-engine-architecture.md)。
@@ -66,14 +66,14 @@ pnpm start
 见 [.env.example](.env.example)，完整配置说明在
 [docs/operations.md](docs/operations.md)。核心项：
 
-| 变量 | 说明 |
-| --- | --- |
-| `APP_ORIGIN` | 唯一站点 origin，影响 Cookie 与同源校验 |
-| `ADMIN_PASSWORD_HASH` | scrypt 口令哈希（`pnpm setup` 生成） |
-| `SESSION_SECRET` | 会话签名盐，至少 32 字符随机值 |
-| `FANPHOTO_DATA_DIR` | SQLite / media / backups 目录 |
-| `HOST` / `PORT` | 默认 `127.0.0.1:8787`，仅本机反代可达 |
-| `NODE_ENV` / `TRUST_LOCAL_PROXY` | 生产模式 / 可信反代开关 |
+| 变量                             | 说明                                    |
+| -------------------------------- | --------------------------------------- |
+| `APP_ORIGIN`                     | 唯一站点 origin，影响 Cookie 与同源校验 |
+| `ADMIN_PASSWORD_HASH`            | scrypt 口令哈希（`pnpm setup` 生成）    |
+| `SESSION_SECRET`                 | 会话签名盐，至少 32 字符随机值          |
+| `FANPHOTO_DATA_DIR`              | SQLite / media / backups 目录           |
+| `HOST` / `PORT`                  | 默认 `127.0.0.1:8787`，仅本机反代可达   |
+| `NODE_ENV` / `TRUST_LOCAL_PROXY` | 生产模式 / 可信反代开关                 |
 
 ## 数据库初始化
 

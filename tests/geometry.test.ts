@@ -299,9 +299,7 @@ test('surround density matches the flat wall: same gaps, portraits fill columns'
       for (const tile of tiles) {
         const ratio = tile.photo.width / tile.photo.height
         if (ratio >= 1) {
-          assert.ok(
-            Math.abs(tile.width / (cell - gap) - Math.min(1, Math.sqrt(ratio))) < 1e-9,
-          )
+          assert.ok(Math.abs(tile.width / (cell - gap) - Math.min(1, Math.sqrt(ratio))) < 1e-9)
         } else {
           assert.ok(
             tile.width / (cell - gap) >= 0.7,
@@ -330,8 +328,7 @@ test('surround density matches the flat wall: same gaps, portraits fill columns'
         // them to full wall width; portraits already match flat density, so
         // the honest parity floor for the average is 0.7.
         const flatArea =
-          flat.tiles.reduce((sum, tile) => sum + tile.width * tile.height, 0) /
-          flat.tiles.length
+          flat.tiles.reduce((sum, tile) => sum + tile.width * tile.height, 0) / flat.tiles.length
         const surroundArea =
           tiles.reduce((sum, tile) => sum + tile.width * tile.height, 0) / tiles.length
         assert.ok(

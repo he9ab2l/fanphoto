@@ -73,8 +73,7 @@ export function lensField(
       const distance = sdRoundedBox(px, py, halfW, halfH, radius)
       const i = (y * w + x) * 4
       // 0 deep inside the pane (flat glass — no displacement), 1 at the rim.
-      const falloff =
-        distance < 0 ? smoothstep(Math.min(1, Math.max(0, 1 + distance / band))) : 1
+      const falloff = distance < 0 ? smoothstep(Math.min(1, Math.max(0, 1 + distance / band))) : 1
       const height = falloff * falloff
       if (height <= 0) {
         // Interior: neutral displacement, zero rim height.
