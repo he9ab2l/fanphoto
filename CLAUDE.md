@@ -50,28 +50,19 @@ svc: systemctl {start|stop|restart|status} fanphoto.service
 - **照片证据**：docs/photo-manifest.json（70 份 SHA256/来源/许可）+ docs/photo-sources.md 署名；网页按 CC BY/CC0 署名来源。
 - **旧版资源**：旧实现已在 git 历史移除（commit 4c2ed7e），归档不可恢复；不要做兼容层。
 
-## 照片墙布局（纯函数在 `apps/client/src/gallery/geometry.ts`）
-- 平铺改为整段动态规划：对称惩罚过大/过小的视觉面积，兼顾行高、短边和相邻行变化；保持原始顺序及真实比例。
-- 参数集中在 `DEFAULT_JUSTIFY_OPTIONS`，三档密度分别设置手机目标行高；`JustifyOverrides` 支持嵌套部分覆盖，Masonry `options` 透传。
-- 矩形墙约束保留；病态超长竖图、以及与所有相邻图都无法满足阅读下限的孤立窄图使用有界居中例外，不放大成巨幅。普通合法行全部铺满。
-- `appendMasonry` 分页只重排最后两行，避免追加照片使已浏览区域整体跳动。
-- 环绕是单水平曲率的无限照片空间；竖图按面积收敛尺寸，单次大滚动立即补足可见窗口，闲置/隐藏/详情打开时停止帧循环。
-- 几何改动跑 `node --import tsx --test tests/geometry.test.ts`，包含真实 manifest、七档宽度、面积分布、比例、矩形与分页稳定性检查。
-
 ## 需求记录（长期约定：开发过程中每确认一条需求/决策就及时追加于此，改即覆写维护）
 | 日期 | 需求 / 决策 | 状态 |
 | --- | --- | --- |
-| 2026-09-07 | 照片墙重写为 Adaptive Justified Gallery V2.1（提示词 10 条：previousHeight 独立、extreme 真 special row、soft/hard 双带宽带、5 层分层评分不堆权重、轻量 next-row preview、末行 A 策略、emitRow 浮点修正、保持原始顺序、架构不变、先设计后改码） | ✅ 已实现 |
-| 2026-09-07 | **矩形墙（硬需求）**：不论什么比例屏幕，所有照片铺满后整体是长方形，不能因照片少留下空缺 | ✅ 已实现（planTail 尾部整体规划，最后一行也铺满） |
-| 2026-09-07 | 窄图不被压成小条：行内极差对全景/竖图混合要收敛（此前 6.7×、最窄 99px） | ✅ 已实现（tileDispersion 5/3.5 + soft/strict 下限提升，最窄 117px） |
-| 2026-09-07 | 参考 miromannino/Justified-Gallery 学习后重写优化 | ✅ 已实现（k* 锚定行填充 + maxRowHeightFactor） |
-| 2026-09-07 | 布局参数不硬编码，集中配置、方便调试 | ✅ 已实现（DEFAULT_JUSTIFY_OPTIONS + Partial 覆盖 + Masonry options prop） |
-| 2026-09-08 | 严格按 `~/问题清单.txt` 与 `FanPhoto 照片详情页 UI 改动.md` 修复详情、照片大小失衡、排版、玻璃、折叠闪屏和加载慢；两份原文不改，不用其他提示词覆盖 | ✅ 已实现、验证并部署 |
-| 2026-09-08 | 只保留「平铺」「环绕」；环绕是原圆柱的无限滑动照片空间，移除球面代码与文案 | ✅ 已实现、验证并部署 |
-| 2026-09-08 | 复用 Base UI/MingCute/Motion 和设计、玻璃、无障碍、性能 skills；图标语义对应，液态折射和毛玻璃分层、可降级 | ✅ 已实现、验证并部署 |
-| 2026-09-08 | 前后端一起优化，网站加载速度优先；首屏按需加载、主图优先、静态 Brotli/gzip、API 压缩与轻量数据库查询，权限边界不变 | ✅ 已实现、验证并部署  |
-| 2026-09-08 | **FanPhoto Glass Engine 重构**：按《FanPhoto 项目前端重构.md》将全站玻璃升级为 Apple Photos + iOS 26 Liquid Glass 风格——统一 src/glass/ 引擎（GlassSurface 唯一入口 + 5 档材质 GlassMaterial + 环境采样 thumbhash→OKLCH 克制着色 + 动态光源 pointer→CSS 变量 + motion/react 弹簧交互 + SDF 透镜位移场 + SVG 折射渲染器含边缘 RGB 色散与光照合成 + WebGL hero 透镜自动降级 SVG）；PhotoDialog 桌面详情面板成为悬浮玻璃（照片环境色 + WebGL 重建背景折射）；连续圆角系统；全站单玻璃样式层 glass.css（删除 materials.css/glass-map/旧 vendor GlassSurface）；motion 与 WebGL renderer 拆为懒加载 chunk，入口 chunk 492KB→270KB；测试站部署 release.Om8mnP，44 项回归 + verify-live 全过 | ✅ 已实现、验证并部署 |
+| 2026-09-07 | 照片墙重写：Adaptive Justified Gallery（整段动态规划、矩形墙硬约束、窄图下限收敛、参数集中配置、分页稳定） | ✅ 已实现 |
+| 2026-09-08 | 按 `~/问题清单.txt` 与 `FanPhoto 照片详情页 UI 改动.md` 修复详情/排版/玻璃/加载（原文已实现后按约定删除） | ✅ 已实现、验证并部署 |
+| 2026-09-08 | 只保留「平铺」「环绕」两种模式 | ✅ 已实现、验证并部署 |
+| 2026-09-08 | 复用 Base UI/MingCute/Motion 与设计、玻璃、无障碍、性能 skills；玻璃分层、可降级 | ✅ 已实现、验证并部署 |
+| 2026-09-08 | 网站加载速度优先：首屏按需加载、主图优先、静态 Brotli/gzip、API 压缩，权限边界不变 | ✅ 已实现、验证并部署 |
+| 2026-09-08 | Glass Engine 玻璃引擎重构（材料/环境/光照/弹簧/折射渲染器，详见 `docs/glass-engine-architecture.md`） | ✅ 已实现、验证并部署（release.Om8mnP） |
 
 ## 用户偏好
 - **需求及时记录（永久规则）**：每确认一条需求/决策立即追加到上方「需求记录」表并提交；以后每次开发默认遵守。
-- 简体中文汇报、结论先行；严格模式（无兼容层、改即覆写、最小改动）；高风险破坏性操作（删数据/备份/归档）需先确认；可能授权全权委托但要求最终汇报。
+- 简体中文汇报、结论先行；严格模式（无兼容层、改即覆写、最小改动）。
+- 高风险破坏性操作（删数据/备份/归档）执行前**不需要确认**，自主判断执行，但完成后必须汇报。
+- **注意服务器占用**：ten 是共享 4 核 VPS，避免长时间高 CPU/高内存任务（批量解码、软件浏览器、超长构建等），必要任务限流或错峰。
+- 可能授权全权委托但要求最终汇报。
