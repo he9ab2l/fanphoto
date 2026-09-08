@@ -4,10 +4,7 @@
 const MAX_ENTRIES = 24
 const store = new Map<string, string>()
 
-export function cachedOrCompute<T extends string>(
-  key: string,
-  compute: () => T,
-): T | null {
+export function cachedOrCompute<T extends string>(key: string, compute: () => T): T | null {
   const cached = store.get(key) as T | undefined
   if (cached !== undefined) return cached
   const value = compute()

@@ -1,8 +1,6 @@
 /** Rendering strategy. Probes the environment once and lets surfaces decide:
  * css (frosted) → svg (displacement refraction, Chromium) → webgl (hero lens).
  * Everything falls back toward css; nothing depends on the enhanced paths. */
-export type RenderStrategy = 'css' | 'svg' | 'webgl'
-
 export interface GlassCapabilities {
   /** backdrop-filter is painted by this browser at all. */
   backdrop: boolean
@@ -19,8 +17,7 @@ export function glassCapabilities(): GlassCapabilities {
   const preferences = matchMedia(
     '(prefers-reduced-transparency: reduce), (prefers-contrast: more), (prefers-reduced-motion: reduce)',
   )
-  const connection = (navigator as Navigator & { connection?: { saveData?: boolean } })
-    .connection
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
   const backdrop =
     CSS.supports('backdrop-filter', 'blur(1px)') ||
     CSS.supports('-webkit-backdrop-filter', 'blur(1px)')
@@ -40,6 +37,8 @@ export const resetGlassCapabilities = () => {
 }
 
 export function prefersReducedTransparency() {
-  return matchMedia('(prefers-reduced-transparency: reduce)').matches ||
+  return (
+    matchMedia('(prefers-reduced-transparency: reduce)').matches ||
     matchMedia('(prefers-contrast: more)').matches
+  )
 }

@@ -31,7 +31,13 @@ function PendingPhotoDialog() {
             正在打开照片
           </Dialog.Title>
           <Spinner label="打开照片详情" />
-          <GlassSurface material="thin" shape="capsule" interactive specular className="photo-opening-close">
+          <GlassSurface
+            material="thin"
+            shape="capsule"
+            interactive
+            specular
+            className="photo-opening-close"
+          >
             <Dialog.Close render={<IconButton icon="close" label="关闭照片详情" />} />
           </GlassSurface>
         </Dialog.Popup>

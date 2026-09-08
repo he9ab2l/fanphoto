@@ -64,13 +64,7 @@ export function GalleryControls({
         </Popover.Root>
       </div>
       <div className="gallery-dock-pos">
-        <GlassSurface
-          material="thin"
-          shape="capsule"
-          interactive
-          specular
-          className="gallery-dock"
-        >
+        <GlassSurface material="thin" shape="capsule" interactive specular className="gallery-dock">
           <RadioGroup
             className="mode-options"
             value={mode}
@@ -92,7 +86,9 @@ export function GalleryControls({
           </RadioGroup>
           <span className="dock-divider" aria-hidden="true" />
           <Popover.Root open={searchOpen} onOpenChange={setSearchOpen}>
-            <Popover.Trigger render={<IconButton icon="filter" label="筛选照片" active={active} />} />
+            <Popover.Trigger
+              render={<IconButton icon="filter" label="筛选照片" active={active} />}
+            />
             <Popover.Portal>
               <Popover.Positioner
                 className="popover-positioner"

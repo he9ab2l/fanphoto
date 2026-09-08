@@ -185,8 +185,7 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
     },
     [layout.photo.x, layout.photo.y, layout.photo.width, layout.photo.height],
   )
-  const webglOn =
-    !mobile && expanded && Boolean(summary) && readyPhoto === summary?.id
+  const webglOn = !mobile && expanded && Boolean(summary) && readyPhoto === summary?.id
   const close = useCallback(() => {
     if (location.state?.background) navigate(-1)
     else navigate('/' + location.search, { replace: true })
@@ -605,7 +604,13 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
             </Drawer.Root>
           )}
           {!locked && (
-            <GlassSurface material="thin" shape="capsule" interactive specular className="detail-corner">
+            <GlassSurface
+              material="thin"
+              shape="capsule"
+              interactive
+              specular
+              className="detail-corner"
+            >
               {!mobile && (
                 <IconButton
                   ref={infoButton}

@@ -45,20 +45,20 @@ System**，最终观感接近 Apple Photos / iOS 26 Liquid Glass / visionOS，�
   gallery-dock / brand / detail-nav / detail-corner / photo-opening   → thin + interactive + specular
   FilterPanel / Appearance / brand-menu / title-popover（popover）    → regular（frosted 面板）
   Modal / Confirm / select-popup                                       → thick（浮层）
-  detail-info（PhotoDialog 桌面详情面板）                              → regular + tint=auto + refractive
+  detail-info（PhotoDialog 桌面详情面板）                              → thick + tint=auto + refractive
                                                                         + WebGL hero 表面
   detail-sheet（移动底部抽屉）                                         → thick + tint=auto
 ```
 
 ## 2. 文件迁移计划
 
-| 来源 | 去向 | 说明 |
-| --- | --- | --- |
-| `apps/client/src/vendor/GlassSurface.tsx` | `apps/client/src/glass/GlassSurface.tsx` | React 接口迁入引擎目录，删除旧实现 |
-| `apps/client/src/ui/glass-map.ts` 的位移场与预算 | `apps/client/src/glass/displacement/lens-field.ts` + `cache.ts` | 保留算法，按 SDF 重写（含中心折射） |
-| `apps/client/src/styles/materials.css` 玻璃样式 | `apps/client/src/styles/glass.css`（新增） | token 由 `GlassMaterial.ts` 注入；无重复 CSS |
-| `apps/client/src/styles/base.css` 中 `.material`/`.glass-surface` 玻璃段 | `glass/` 样式层 | 从 base.css 删除玻璃实现，只留 token 引用 |
-| `apps/client/src/styles/viewer.css` 中 `.detail-info` 固定 frosted 背景 | 由 `GlassSurface material="regular"` + 环境 tint 接管 | 背景色走引擎变量 |
+| 来源                                                                     | 去向                                                            | 说明                                         |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------- |
+| `apps/client/src/vendor/GlassSurface.tsx`                                | `apps/client/src/glass/GlassSurface.tsx`                        | React 接口迁入引擎目录，删除旧实现           |
+| `apps/client/src/ui/glass-map.ts` 的位移场与预算                         | `apps/client/src/glass/displacement/lens-field.ts` + `cache.ts` | 保留算法，按 SDF 重写（含中心折射）          |
+| `apps/client/src/styles/materials.css` 玻璃样式                          | `apps/client/src/styles/glass.css`（新增）                      | token 由 `GlassMaterial.ts` 注入；无重复 CSS |
+| `apps/client/src/styles/base.css` 中 `.material`/`.glass-surface` 玻璃段 | `glass/` 样式层                                                 | 从 base.css 删除玻璃实现，只留 token 引用    |
+| `apps/client/src/styles/viewer.css` 中 `.detail-info` 固定 frosted 背景  | 由 `GlassSurface material="thick"` + 环境 tint 接管           | 背景色走引擎变量                             |
 
 ## 3. 删除列表
 
@@ -96,13 +96,13 @@ apps/client/src/styles/glass.css    引擎样式层（材质变量 + 各渲染�
 
 ## 5. 性能风险与对策
 
-| 风险 | 对策 |
-| --- | --- |
-| backdrop-filter url 滤镜过重 | 面积预算沿用 `width*height<=60_000` 且限高 160（控制面）；阅读面板走 CSS frosted，不叠折射 |
-| WebGL 每帧重绘 | 仅一个 hero 表面（桌面详情面板）；render-on-change（id/布局/图片就绪），非 rAF 常驻；DPR ≤ 1.5 |
-| 色散/光照叠加成本 | 色散只 ±1px、仅 edges 通道；specular 为 CSS radial-gradient 单层，由 GlassLight rAF 合帧更新 |
-| 低端设备 | hardwareConcurrency ≤2 / saveData / reduced-motion / reduced-transparency / 无 WebGL → 自动走 CSS 毛玻璃 |
-| 内存 | displacement 图 LRU ≤16；WebGL 纹理随面板尺寸重建并释放旧纹理；析构时 delete 上下文资源 |
-| 多玻璃层 overdraw | 抽屉/角落/浮层合并为一个 GlassSurface 容器（gallery 统一玻璃层），不逐元素 blur |
-| context 丢失 | 监听 webglcontextlost/restored；丢失期间静态 CSS 保底 |
-| 移动端 | 不做 WebGL；抽屉玻璃用 CSS frosted + 环境 tint，控制点用 thin 材质 |
+| 风险                         | 对策                                                                                                     |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- |
+| backdrop-filter url 滤镜过重 | 面积预算沿用 `width*height<=60_000` 且限高 160（控制面）；阅读面板走 CSS frosted，不叠折射               |
+| WebGL 每帧重绘               | 仅一个 hero 表面（桌面详情面板）；render-on-change（id/布局/图片就绪），非 rAF 常驻；DPR ≤ 1.5           |
+| 色散/光照叠加成本            | 色散只 ±1px、仅 edges 通道；specular 为 CSS radial-gradient 单层，由 GlassLight rAF 合帧更新             |
+| 低端设备                     | hardwareConcurrency ≤2 / saveData / reduced-motion / reduced-transparency / 无 WebGL → 自动走 CSS 毛玻璃 |
+| 内存                         | displacement 图 LRU ≤16；WebGL 纹理随面板尺寸重建并释放旧纹理；析构时 delete 上下文资源                  |
+| 多玻璃层 overdraw            | gallery 的 dock/brand/计数统一走引擎（GlassSurface + 同一 token 层），不逐元素独立 blur                          |
+| context 丢失                 | 监听 webglcontextlost/restored；丢失期间静态 CSS 保底                                                    |
+| 移动端                       | 不做 WebGL；抽屉玻璃用 CSS frosted + 环境 tint，控制点用 thin 材质                                       |

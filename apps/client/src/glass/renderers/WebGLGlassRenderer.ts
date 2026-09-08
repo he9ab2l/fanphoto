@@ -4,7 +4,6 @@
  * rounded-box SDF lens: refraction, gaussian frost, RGB chromatic aberration
  * at edges, fresnel rim, specular tint. Static render-on-change; no rAF loop.
  * Degrades cleanly to the SVG/CSS path (auto-fallback) on any failure. */
-import { sdRoundedBox } from '../displacement/sdf'
 import { oklchToSrgb } from '../oklch'
 
 export interface WebGLGlassConfig {
@@ -24,11 +23,7 @@ export interface WebGLGlassConfig {
   rim: number
   /** Paint the true backdrop into `ctx` (already scaled to DPR; draw in CSS
    * px). Called again whenever the environment underneath may have moved. */
-  paintBackdrop: (
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-  ) => void
+  paintBackdrop: (ctx: CanvasRenderingContext2D, width: number, height: number) => void
 }
 
 const VERTEX = `
@@ -327,6 +322,3 @@ export class WebGLGlassRenderer {
     this.render()
   }
 }
-
-/** Reused by tests/consumers for exact shape math. */
-export { sdRoundedBox }

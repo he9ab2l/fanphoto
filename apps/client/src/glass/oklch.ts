@@ -11,8 +11,7 @@ export interface Rgb01 {
   b: number
 }
 
-const srgbToLinear = (v: number) =>
-  v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+const srgbToLinear = (v: number) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4))
 
 export const srgbToOklch = (rgb: Rgb01): Oklch => {
   const r = srgbToLinear(rgb.r),
@@ -54,8 +53,7 @@ export const oklchToSrgb = ({ l, c, h }: Oklch): Rgb01 => {
   const bl = -0.0041960863 * l__ - 0.7034186147 * m__ + 1.707614701 * s__
   const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
   // linear → sRGB
-  const enc = (v: number) =>
-    v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055
+  const enc = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055)
   return { r: clamp01(enc(r)), g: clamp01(enc(g)), b: clamp01(enc(bl)) }
 }
 

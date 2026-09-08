@@ -1,7 +1,7 @@
 /** Environment System. Turns the current photo's thumbhash average color into
  * a restrained OKLCH glass tint, published as document-level CSS variables so
  * every glass surface belongs to its environment without per-surface sampling. */
-import { useMemo, useEffect } from 'react'
+import { useEffect } from 'react'
 import type { PhotoSummary } from '@fanphoto/contracts'
 import { thumbHashToAverageRGBA } from 'thumbhash'
 import { srgbToOklch, oklch, neutralOklch, type Oklch } from './oklch'
@@ -15,8 +15,7 @@ const DARK_TARGET = 0.27
 const MAX_CHROMA = 0.05
 const MIN_CHROMA = 0.014
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, value))
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
 function averageRgb(hash: string): { r: number; g: number; b: number } | null {
   try {
@@ -44,15 +43,7 @@ export function tintFromPhoto(thumbHash: string | null, theme: GlassTheme): Oklc
   return { l: lightness, c: chroma, h: hue }
 }
 
-export const tintToCss = (tint: Oklch | null, theme: GlassTheme, alpha = 1) =>
-  oklch(tint || neutralOklch(theme === 'dark' ? DARK_TARGET : LIGHT_TARGET), alpha)
-
 export const AMBIENT_EVENT = 'fanphoto:glass-ambient'
-
-/** Neutral fallback that glass surfaces use when no photo context exists. */
-export function neutralTint(theme: GlassTheme): Oklch {
-  return neutralOklch(theme === 'dark' ? DARK_TARGET : LIGHT_TARGET)
-}
 
 const BASE_NEUTRAL: Record<GlassTheme, Oklch> = {
   light: { l: 0.9, c: 0.006, h: 250 },
@@ -98,14 +89,6 @@ export function useGlassAmbient(photo: PhotoSummary | null | undefined, theme: G
       setGlassAmbient(null, theme)
     }
   }, [photo?.thumbHash, theme])
-}
-
-/** Sample a specific photo directly (surfaces with their own photo context). */
-export function useGlassTint(photo: PhotoSummary | null | undefined, theme: GlassTheme): string {
-  return useMemo(
-    () => oklch(tintFromPhoto(photo?.thumbHash ?? null, theme), 1),
-    [photo?.thumbHash, theme],
-  )
 }
 
 /** Read the currently published ambient (for one-shot surfaces). */

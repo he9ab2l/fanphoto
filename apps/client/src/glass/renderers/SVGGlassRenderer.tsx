@@ -4,8 +4,6 @@
  * G 0, B −1px, only at edges) → optional lighting composite (rim sheen).
  * Only surfaces inside the lens budget receive this; everything else keeps the
  * plain CSS frosted material. */
-import type { MaterialSpec } from '../GlassMaterial'
-
 export interface SVGGlassFilterProps {
   id: string
   refraction: number
@@ -109,15 +107,19 @@ export function SVGGlassFilter({
               >
                 <fePointLight x="-120" y="-120" z="160" />
               </feSpecularLighting>
-              <feComposite in="rim" in2={base} operator="arithmetic" k1="0" k2="0.35" k3="1" k4="0" />
+              <feComposite
+                in="rim"
+                in2={base}
+                operator="arithmetic"
+                k1="0"
+                k2="0.35"
+                k3="1"
+                k4="0"
+              />
             </>
           )}
         </filter>
       </defs>
     </svg>
   )
-}
-
-export function materialSupportsSVG(spec: MaterialSpec) {
-  return spec.refraction > 0
 }

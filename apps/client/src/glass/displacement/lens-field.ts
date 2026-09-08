@@ -16,7 +16,10 @@ export const LENS_MAX_HEIGHT = 160
 export const LENS_BUDGET = 60_000
 
 export const withinLensBudget = (width: number, height: number) =>
-  width > 0 && height > 0 && width <= LENS_MAX_WIDTH && height <= LENS_MAX_HEIGHT &&
+  width > 0 &&
+  height > 0 &&
+  width <= LENS_MAX_WIDTH &&
+  height <= LENS_MAX_HEIGHT &&
   width * height <= LENS_BUDGET
 
 /** surface size (CSS px) → rasterized lens field data URL (LRU-cached). */
@@ -68,8 +71,7 @@ export function lensField(
       const distance = sdRoundedBox(px, py, halfW, halfH, radius)
       const [nx, ny] = sdfNormal(px, py, halfW, halfH, radius)
       // 0 at the rim edge, growing to 1 a few px inside; 0 outside the pane.
-      const edgeFalloff =
-        distance < 0 ? Math.min(1, Math.max(0, 1 + distance / band) ** 2) : 0
+      const edgeFalloff = distance < 0 ? Math.min(1, Math.max(0, 1 + distance / band) ** 2) : 0
       const amount = centerStrength + edgeFalloff * edgeStrength
       const i = (y * w + x) * 4
       // Refraction bends toward the pane center: invert the outward normal.

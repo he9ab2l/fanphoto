@@ -25,12 +25,7 @@ import {
   type MaterialLevel,
 } from './GlassMaterial'
 import { neutralOklch, type Oklch } from './oklch'
-import {
-  AMBIENT_EVENT,
-  blendGlassBg,
-  readGlassAmbient,
-  tintFromPhoto,
-} from './GlassEnvironment'
+import { AMBIENT_EVENT, blendGlassBg, readGlassAmbient, tintFromPhoto } from './GlassEnvironment'
 import { glassCapabilities } from './GlassRenderer'
 import { subscribeGlassLight, type GlassLightState } from './GlassLight'
 import { withinLensBudget, lensFieldDataUrl } from './displacement/lens-field'
