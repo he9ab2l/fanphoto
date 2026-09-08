@@ -7,7 +7,7 @@
 - 已上线：`https://test.heabl.xyz`（Caddy v2 → ten:127.0.0.1:8787，systemd `fanphoto.service`）
 - 图库：70 张 Wikimedia Commons 真实风景原片（横 26 / 竖 14 / 方 12 / 全景 18，GPS 46 张）
 - 当前发布：`release.SGjodQ`（2026-09-09，生产级重构：环绕密度对齐 + 玻璃 token 统一 + zod 4.5 + 文档/文件结构治理）；verify-live 域名验收通过
-- 分支：`main`（已部署基准）+ `refactor/production-ready`（本轮生产级重构，未合并 main，按任务要求留在分支）
+- 分支：只剩 `main`（`refactor/production-ready` 已合并 main 后删除）
 - 管理端：`/studio`，密码在 ten 服务器 `/home/ubuntu/fanphoto-next/admin-credentials.txt`（600 权限，勿外泄）
 
 ## 代码与拓扑
