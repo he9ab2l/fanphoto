@@ -2,10 +2,11 @@
 
 相册站（user 的长期项目，会继续开发）。**fanphoto 2.0 = 全新架构，无旧版兼容层，不迁旧数据。**
 
-## 现状（2026-09-08）
+## 现状（2026-09-09）
 - 已上线：`https://test.heabl.xyz`（Caddod v2 → ten:127.0.0.1:8787，systemd `fanphoto.service`）
 - 图库：70 张 Wikimedia Commons 真实风景原片（横 26 / 竖 14 / 方 12 / 全景 18，GPS 46 张）
-- 当前发布：`release.QLYqBJ`（2026-09-08 19:25，当前 `current` 符号链接；xG3VoR 为同日早间发布）；仅平铺/环绕。详情、玻璃与加载优化已部署，44 项回归和线上必要浏览器检查通过，详见 `docs/acceptance.md`。
+- 当前发布：`release.Om8mnP`（2026-09-09 00:46，Glass Engine 玻璃引擎版，已切换 `current`）；44 项回归 + verify-live 域名验收通过，详见 `docs/acceptance.md`。
+- 当前开发分支：`feat/glass-engine`（已推送，未合并 main）。
 - 管理端：`/studio`，密码在 ten 服务器 `/home/ubuntu/fanphoto-next/admin-credentials.txt`（600 权限，勿外泄）
 
 ## 代码与拓扑
