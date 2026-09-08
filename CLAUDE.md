@@ -4,10 +4,10 @@
 
 ## 现状（2026-09-09）
 
-- 已上线：`https://test.heabl.xyz`（Caddod v2 → ten:127.0.0.1:8787，systemd `fanphoto.service`）
+- 已上线：`https://test.heabl.xyz`（Caddy v2 → ten:127.0.0.1:8787，systemd `fanphoto.service`）
 - 图库：70 张 Wikimedia Commons 真实风景原片（横 26 / 竖 14 / 方 12 / 全景 18，GPS 46 张）
-- 当前发布：`release.Om8mnP`（2026-09-09 00:46，Glass Engine 玻璃引擎版，已切换 `current`）；44 项回归 + verify-live 域名验收通过，详见 `docs/acceptance.md`。
-- 当前开发分支：`feat/glass-engine`（已推送，未合并 main）。
+- 当前发布：`release.Om8mnP`（2026-09-09 00:46）；线上仍是修复前的 Glass Engine，`ef09eb3` 修复尚未发布
+- 当前开发分支：`feat/glass-engine`（已推送，未合并 main；最新 ef09eb3 = 液态玻璃六处缺陷修复 + 预算提升）
 - 管理端：`/studio`，密码在 ten 服务器 `/home/ubuntu/fanphoto-next/admin-credentials.txt`（600 权限，勿外泄）
 
 ## 代码与拓扑
@@ -65,6 +65,8 @@ svc: systemctl {start|stop|restart|status} fanphoto.service
 | 2026-09-08 | 复用 Base UI/MingCute/Motion 与设计、玻璃、无障碍、性能 skills；玻璃分层、可降级                           | ✅ 已实现、验证并部署                   |
 | 2026-09-08 | 网站加载速度优先：首屏按需加载、主图优先、静态 Brotli/gzip、API 压缩，权限边界不变                         | ✅ 已实现、验证并部署                   |
 | 2026-09-08 | Glass Engine 玻璃引擎重构（材料/环境/光照/弹簧/折射渲染器，详见 `docs/glass-engine-architecture.md`）      | ✅ 已实现、验证并部署（release.Om8mnP） |
+| 2026-09-09 | 液态玻璃六处缺陷修复（SVG 色散丢蓝通道、WebGL 边缘因子/rim 反转、透镜场内部接缝、光系统无限 rAF、高光 setState 风暴、WebGL 探测误加载）；折射预算提升至 1024×900/280k px；文档对齐实现 | ✅ 已实现、测试通过（44/44，未发布） |
+| 2026-09-09 | UI 组件层重构暂缓；后续需要新组件时优先从 `~/ui-libraries/components` 组件库选型，不手写                   | 📌 约定                                   |
 
 ## 用户偏好
 
