@@ -36,7 +36,7 @@ ssh ten 'cd /home/ubuntu/fanphoto-next/workspace && pnpm test'          # 44 项
 ssh ten 'cd /home/ubuntu/fanphoto-next/workspace && bash deploy/release.sh'
 # 导入图片 / 验收 / 审计 / 备份
 FANPHOTO_ENV_FILE=/home/ubuntu/fanphoto-next/.env pnpm photos:import   # 在 ten workspace 跑
-node tools/verify-live.mjs   # 域名级验收（断言 70 张！加图需同步改）
+node tools/verify-live.mjs   # 域名级验收（在 ten workspace 跑，断言 70 张！加图需同步改）
 FANPHOTO_ENV_FILE=... pnpm exec tsx tools/audit-photos.ts              # 哈希/元数据审计
 svc: systemctl {start|stop|restart|status} fanphoto.service
 ```
