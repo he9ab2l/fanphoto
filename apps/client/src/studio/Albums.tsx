@@ -8,10 +8,10 @@ import {
   ErrorState,
   Field,
   IconButton,
-  Input,
   Modal,
   Spinner,
 } from '../ui/primitives'
+import { Input } from '../ui/fields'
 import { Icon } from '../ui/icons'
 
 function AlbumEditor({ album, onClose }: { album: Album | null; onClose: () => void }) {

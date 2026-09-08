@@ -48,8 +48,9 @@ export const useSession = () =>
     },
     staleTime: 60000,
   })
-export function usePhotos(filters: Record<string, string>, admin = false) {
+export function usePhotos(filters: Record<string, string>, admin = false, enabled = true) {
   return useInfiniteQuery({
+    enabled,
     queryKey: ['photos', admin, filters],
     initialPageParam: '',
     queryFn: ({ pageParam, signal }) => {

@@ -7,7 +7,7 @@
 
 ```text
 React 浏览器
-  ├─ gallery：自然比例平铺 / 圆柱 / 球面 / 背景详情
+  ├─ gallery：自然比例平铺 / 无限环绕 / 背景详情
   ├─ studio：认证 / 图库 / 上传 / 编辑 / 相册 / 设置
   └─ ui：Base UI + MingCute + 共享主题
            │ 同源 /api/v1 与 /media/photos
@@ -32,7 +32,7 @@ Caddy HTTPS → Hono HTTP 装配
 
 - React 19 + Vite + TypeScript；React Router 使用背景路由，让详情打开时原照片墙保持挂载。
 - TanStack Query 管理服务端数据、取消旧查询、游标与更新失效；界面偏好独立存于 localStorage。
-- gallery / studio / 大型交互按入口懒加载；没有地图、旧查看器、客户端 HEIC/TIFF 解码器等遗留负担。
+- studio、详情动画、元数据样式、筛选表单、显示设置、通知按需加载；首屏不提前下载这些交互代码。
 - Base UI 负责按钮、弹层、选择、开关、滑块、复选框与焦点；不手写焦点陷阱。
 - React Bits Masonry / DomeGallery / GlassSurface 的适配见 `ui-resources.md` 和 `vendor/NOTICE.md`。
 - MingCute 是唯一图标体系；不请求远程图标 CDN，不手画图标。
@@ -40,11 +40,12 @@ Caddy HTTPS → Hono HTTP 装配
 
 ### 照片墙
 
-平铺用最短列布局，尺寸来自服务器元数据。宽高比严格保持，全景可以跨列；
-图片使用 `object-fit: contain`，不是正方形裁切。列表末尾的 IntersectionObserver 触发下一页。
+平铺使用整段动态规划，评分同时约束照片面积、行高、短边和相邻行变化，尺寸来自服务器元数据。
+宽高比严格保持，每行铺满；病态超长竖图使用有界兜底。分页只重排末尾两行，已浏览的主体行保持位置。
+图片使用 `object-fit: contain`，不是方形裁切；IntersectionObserver 提前触发下一页。
 
-圆柱和球面将真实比例的矩形图片放置在内侧曲面的切平面上；圆柱只有水平曲率，球面加入
-垂直曲率，不对照片内部做网格拉伸。虚拟列 / 行周期支持正反方向循环探索。
+环绕将真实比例的矩形图片放置在只有水平曲率的内侧曲面切平面上，不对照片做网格拉伸。
+竖图按视觉面积约束尺寸，虚拟列 / 行周期支持正反方向无限探索。
 Pointer / wheel 输入由成熟手势库管理，惯性与每帧 transform 在 ref 中，React 只更新粗粒度窗口。
 停止、隐藏标签页、打开详情、卸载后均不保留空转循环；减少动态时禁用惯性。
 
@@ -135,3 +136,10 @@ SQLite 开启 WAL、外键和 busy timeout；SQL 全部参数绑定。公开过�
    多进程大批量处理时可把 ingest 队列迁移为持久任务 worker，HTTP 契约与照片 ID 保持。
 
 目前没有虚假的评论、AI 标注或私有分享按钮；扩展位置真实存在，但未实现功能不冒充已上线。
+
+## 2026-09 加载优化
+
+- 请求内复用位置可见性投影；公开列表不读取 EXIF、分析和相册 JSON；管理列表不逐张查询原片可用性。
+- 媒体与下载使用资源/照片联表的轻量查询，公开校验先于 ETag，不缓存授权判断。
+- SQLite 有界复用 128 条预编译语句，不缓存查询结果；相册数量/封面以集合查询读取。
+- JSON 使用 Hono 压缩；构建时生成文本资源 `.br`/`.gz`。静态响应包含 Vary、编码独立 ETag 和正确 HEAD 长度。

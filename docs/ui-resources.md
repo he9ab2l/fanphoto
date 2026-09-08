@@ -52,66 +52,67 @@
 | awesome-design-systems | 查阅系统索引；采用已有可用的 Base UI           |
 | fumadocs               | 文档网站框架；本次使用仓库内 Markdown 运维文档 |
 
-## Skills（54）
+## Skills（55）
 
 下列名称均对应 `ui-libraries/skills/<名称>/SKILL.md`，已全文读取用于选型。
 
-| 名称                         | 用途 / 是否用于当前实现                             |
-| ---------------------------- | --------------------------------------------------- |
-| apple-design                 | 使用：直接操控、克制弹簧、半透明层次、主题与触控    |
-| baseline-ui                  | 使用：已有组件优先、语义控件、安全区、短转场        |
-| fixing-accessibility         | 使用：可访问名称、键盘、焦点与 dialog               |
-| fixing-motion-performance    | 使用：只在交互时渲染、批量读写、静态模糊层          |
-| animate                      | 动画构建参考；现有 Motion / CSS 足够                |
-| animate-expo                 | 原生动画，不适用                                    |
-| animation-vocabulary         | 动效术语目录                                        |
-| ask-sonner                   | Toast 方案参考                                      |
-| beautiful-article            | 单文件文章，不适用                                  |
-| brandkit                     | 品牌图像生成，不适用                                |
-| brutalist-skill              | 工业视觉，不适用                                    |
-| create-design-md             | 提取已存在设计系统；本次按明确需求制定迁移文档      |
-| emil-design-eng              | 微交互参考，避免过量动画                            |
-| find-animation-opportunities | 只读机会清单，不启用工作流                          |
-| fixing-metadata              | 页面元信息参考                                      |
-| frontend-slides              | 幻灯片，不适用                                      |
-| gpt-image-2                  | 生图，不适用，测试需要真实风景原片                  |
-| gpt-tasteskill               | 营销 / GSAP 页面，不适用                            |
-| gsap-core                    | GSAP 基础，查阅，不新增平行动画引擎                 |
-| gsap-frameworks              | Vue / Svelte，不适用                                |
-| gsap-performance             | GSAP 性能，查阅                                     |
-| gsap-plugins                 | GSAP 插件，查阅                                     |
-| gsap-react                   | GSAP React，查阅                                    |
-| gsap-scrolltrigger           | 滚动叙事，不适用                                    |
-| gsap-timeline                | 时间轴，查阅                                        |
-| gsap-utils                   | 动画工具目录，查阅                                  |
-| hallmark                     | 通用设计目录，明确 Apple 照片墙需求优先             |
-| image-to-code-skill          | 由生图转网页，不适用                                |
-| imagegen-frontend-mobile     | 手机样机生图，不适用                                |
-| imagegen-frontend-web        | 营销网页生图，不适用                                |
-| improve-animations           | 只读计划，不启用工作流                              |
-| improve-react                | 只读 React 计划，不启用工作流                       |
-| improve-threejs              | Three.js 审查，不采用 WebGL 渲染                    |
-| improve-ui                   | 保持现有视觉的只读审查，与本次整体重构不同          |
-| kb-retriever                 | 本地知识库问答，不适用                              |
-| minimalist-skill             | 编辑风格目录，不覆盖 Apple 规范                     |
-| mono-color-skill             | 印刷单色图像，不适用，照片保持真实颜色              |
-| output-skill                 | 完整性参考，不用占位实现                            |
-| performance                  | 性能取证方法参考                                    |
-| pick-ui-library              | 组件选型目录，Base UI / Motion / Sonner 可用        |
-| prototype                    | 多版本选择器，不适用，用户已明确方向                |
-| react-doctor                 | React 检查参考                                      |
-| redesign-skill               | 审查后升级参考，具体要求优先                        |
-| review-animations            | 动效审查参考                                        |
-| soft-skill                   | 高端营销视觉，不适用                                |
-| stitch-skill                 | Stitch 系统生成，不适用                             |
-| taste-skill                  | 通用前端风格目录，当前明确需求优先                  |
-| taste-skill-v1               | 旧版风格目录，不启用                                |
-| ui-skills-root               | skill 路由参考                                      |
-| ui-ux-pro-max                | UX 与响应式目录，选用更聚焦的上述规范               |
-| web-design-engineer          | 通用网页设计流程，当前明确需求优先                  |
-| web-video-presentation       | 口播 / 录屏演示，不适用                             |
-| website-rebuild              | 1:1 镜像复刻，不适用；参考项目只借鉴设计 / 架构思路 |
-| write-swift                  | Swift，不适用                                       |
+| 名称                         | 用途 / 是否用于当前实现                                              |
+| ---------------------------- | -------------------------------------------------------------------- |
+| apple-design                 | 使用：直接操控、克制弹簧、半透明层次、主题与触控                     |
+| liquid-glass-ui              | 2026-09-08 使用：CSS 毛玻璃、局部 RG 折射、能力/偏好闸门及低成本降级 |
+| baseline-ui                  | 使用：已有组件优先、语义控件、安全区、短转场                         |
+| fixing-accessibility         | 使用：可访问名称、键盘、焦点与 dialog                                |
+| fixing-motion-performance    | 使用：只在交互时渲染、批量读写、静态模糊层                           |
+| animate                      | 动画构建参考；现有 Motion / CSS 足够                                 |
+| animate-expo                 | 原生动画，不适用                                                     |
+| animation-vocabulary         | 动效术语目录                                                         |
+| ask-sonner                   | Toast 方案参考                                                       |
+| beautiful-article            | 单文件文章，不适用                                                   |
+| brandkit                     | 品牌图像生成，不适用                                                 |
+| brutalist-skill              | 工业视觉，不适用                                                     |
+| create-design-md             | 提取已存在设计系统；本次按明确需求制定迁移文档                       |
+| emil-design-eng              | 微交互参考，避免过量动画                                             |
+| find-animation-opportunities | 只读机会清单，不启用工作流                                           |
+| fixing-metadata              | 页面元信息参考                                                       |
+| frontend-slides              | 幻灯片，不适用                                                       |
+| gpt-image-2                  | 生图，不适用，测试需要真实风景原片                                   |
+| gpt-tasteskill               | 营销 / GSAP 页面，不适用                                             |
+| gsap-core                    | GSAP 基础，查阅，不新增平行动画引擎                                  |
+| gsap-frameworks              | Vue / Svelte，不适用                                                 |
+| gsap-performance             | GSAP 性能，查阅                                                      |
+| gsap-plugins                 | GSAP 插件，查阅                                                      |
+| gsap-react                   | GSAP React，查阅                                                     |
+| gsap-scrolltrigger           | 滚动叙事，不适用                                                     |
+| gsap-timeline                | 时间轴，查阅                                                         |
+| gsap-utils                   | 动画工具目录，查阅                                                   |
+| hallmark                     | 通用设计目录，明确 Apple 照片墙需求优先                              |
+| image-to-code-skill          | 由生图转网页，不适用                                                 |
+| imagegen-frontend-mobile     | 手机样机生图，不适用                                                 |
+| imagegen-frontend-web        | 营销网页生图，不适用                                                 |
+| improve-animations           | 只读计划，不启用工作流                                               |
+| improve-react                | 只读 React 计划，不启用工作流                                        |
+| improve-threejs              | Three.js 审查，不采用 WebGL 渲染                                     |
+| improve-ui                   | 保持现有视觉的只读审查，与本次整体重构不同                           |
+| kb-retriever                 | 本地知识库问答，不适用                                               |
+| minimalist-skill             | 编辑风格目录，不覆盖 Apple 规范                                      |
+| mono-color-skill             | 印刷单色图像，不适用，照片保持真实颜色                               |
+| output-skill                 | 完整性参考，不用占位实现                                             |
+| performance                  | 性能取证方法参考                                                     |
+| pick-ui-library              | 组件选型目录，Base UI / Motion / Sonner 可用                         |
+| prototype                    | 多版本选择器，不适用，用户已明确方向                                 |
+| react-doctor                 | React 检查参考                                                       |
+| redesign-skill               | 审查后升级参考，具体要求优先                                         |
+| review-animations            | 动效审查参考                                                         |
+| soft-skill                   | 高端营销视觉，不适用                                                 |
+| stitch-skill                 | Stitch 系统生成，不适用                                              |
+| taste-skill                  | 通用前端风格目录，当前明确需求优先                                   |
+| taste-skill-v1               | 旧版风格目录，不启用                                                 |
+| ui-skills-root               | skill 路由参考                                                       |
+| ui-ux-pro-max                | UX 与响应式目录，选用更聚焦的上述规范                                |
+| web-design-engineer          | 通用网页设计流程，当前明确需求优先                                   |
+| web-video-presentation       | 口播 / 录屏演示，不适用                                              |
+| website-rebuild              | 1:1 镜像复刻，不适用；参考项目只借鉴设计 / 架构思路                  |
+| write-swift                  | Swift，不适用                                                        |
 
 ## 来源与适配边界
 
@@ -124,7 +125,7 @@
   手写 dialog、无终止条件的动画、全量预加载等；不能因为来自库就照搬不符合要求的行为。
 - 照片墙的曲率与自然比例排列是本项目的业务布局；继承可复用组件的结构 / 数学和输入策略，
   拆出可测试的几何函数。按钮、弹层、选择、焦点行为使用成熟组件，不自造重复控件。
-- 玻璃是 Web 毛玻璃近似，不宣称为 Apple 原生 Liquid Glass；Safari / Firefox 使用同等可读的
-  CSS 毛玻璃路径，减少透明度时使用实色。
+- 玻璃采用 CSS 毛玻璃 + 小面积 RG 位移折射增强，不宣称为 Apple 原生 Liquid Glass；
+  Safari / Firefox 使用 CSS 毛玻璃，减少透明度或高对比度偏好时使用实色。
 - Afilmory 与 ChronoFrame 的 README 已阅读：采用照片优先、多尺寸与 EXIF、增量导入、
   存储适配 / 模块边界的思路，不复制其产品代码和视觉品牌。

@@ -1,11 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   masonry,
   project,
   sceneTiles,
   modulo,
   DEFAULT_JUSTIFY_OPTIONS,
+  appendMasonry,
+  mergeJustifyOptions,
 } from '../apps/client/src/gallery/geometry'
 import type { PhotoSummary } from '../packages/contracts/src'
 
@@ -56,17 +59,15 @@ test('masonry preserves every aspect ratio and prevents overlaps at all responsi
       }
     }
 })
-test('cylinder has one curvature axis; sphere adds a stronger second axis without bending image geometry', () => {
+test('surround projection curves horizontally and preserves vertical image geometry', () => {
   const size = { width: 1440, height: 900 }
-  const cylinder = project(500, 260, size, 'cylinder'),
-    sphere = project(500, 260, size, 'sphere')
-  assert.equal(cylinder.rotateX, 0)
-  assert.equal(cylinder.y, 260)
-  assert.ok(sphere.rotateX > 0)
-  assert.ok(sphere.z > cylinder.z)
-  assert.ok(Math.abs(sphere.rotateY) < 30)
-  assert.ok(Math.abs(sphere.rotateX) < 30)
-  assert.deepEqual(project(0, 0, size, 'sphere'), { x: 0, y: 0, z: 0, rotateX: 0, rotateY: -0 })
+  const point = project(500, 260, size)
+  assert.equal(point.y, 260)
+  assert.ok(point.z > 0)
+  assert.ok(Math.abs(point.rotateY) < 30)
+  assert.deepEqual(project(0, 0, size), { x: 0, y: 0, z: 0, rotateY: -0 })
+  assert.equal(project(-500, 260, size).x, -point.x)
+  assert.equal(project(-500, 260, size).z, point.z)
 })
 test('infinite surfaces cover large positive and negative exploration with unique, proportional tiles', () => {
   for (const x of [-100000, -1000, 0, 1000, 100000])
@@ -82,7 +83,7 @@ test('infinite surfaces cover large positive and negative exploration with uniqu
   assert.equal(modulo(-1, 32), 31)
 })
 
-// ---- justified wall V2.1 feature tests ----
+// ---- justified wall invariants ----
 
 const makePhotos = (ratios: number[]): PhotoSummary[] =>
   ratios.map((ratio, i) => ({
@@ -137,7 +138,7 @@ test('single photo fills the wall instead of leaving empty space', () => {
 
 test('pathological ultra-tall tail falls back to bounded special rows, never a giant strip', () => {
   const opts = DEFAULT_JUSTIFY_OPTIONS[2]
-  const cap = opts.targetRowHeight * opts.tailRowHeightCap
+  const cap = opts.targetRowHeight * opts.rowHeightCap
   // 0.15 竖长条：任何满行划分都会突破 cap → 回退 special（高度受限）
   const { tiles } = masonry(makePhotos([0.15, 0.15]), 1440, 2)
   assert.equal(tiles.length, 2)
@@ -164,7 +165,7 @@ test('extreme tall/wide tails: tall is bounded, wide spans the wall flush', () =
 
 test('extreme tail still keeps the wall rectangular and never crushes peers', () => {
   const opts = DEFAULT_JUSTIFY_OPTIONS[2]
-  const cap = opts.targetRowHeight * opts.tailRowHeightCap
+  const cap = opts.targetRowHeight * opts.rowHeightCap
   const { tiles } = masonry(makePhotos([8, 0.4, 0.2]), 1440, 2)
   assert.equal(tiles.length, 3)
   // 8 全景独占一行铺满；0.4/0.2 双竖条收官行铺满（矩形优先）
@@ -172,7 +173,7 @@ test('extreme tail still keeps the wall rectangular and never crushes peers', ()
     assert.ok(tile.x + tile.width <= 1440 + 1e-6)
     assert.ok(tile.height <= cap + 1e-6, 'respects the tail row-height cap')
     const ratio = tile.photo.width / tile.photo.height
-    if (ratio >= opts.extremeWide || ratio <= opts.extremeTall) {
+    if (ratio >= 3.2 || ratio <= 0.45) {
       assert.ok(tile.width >= opts.soft.min - 1e-6, 'extreme figure is never paper-thin')
     }
   }
@@ -190,7 +191,7 @@ test('extreme photo never crushes peers, whether sharing a row or spanning its o
   for (const tile of tiles) {
     const ratio = tile.photo.width / tile.photo.height
     assert.ok(Math.abs(tile.width / tile.height - ratio) < 1e-8, 'proportions kept')
-    if (ratio < opts.extremeWide && ratio > opts.extremeTall) {
+    if (ratio < 3.2 && ratio > 0.45) {
       assert.ok(
         tile.width >= opts.soft.min - 1e-6,
         `peer ${tile.photo.id} crushed to ${tile.width}`,
@@ -215,4 +216,73 @@ test('single square photo fills the wall flush (no special row, no hole)', () =>
   assert.equal(tiles.length, 1)
   assert.ok(Math.abs(tiles[0].x + tiles[0].width - 1440) < 1e-6)
   assert.equal(tiles[0].height, 1440) // 1:1 填满容器宽
+})
+
+test('an isolated portrait between panoramas stays readable without becoming a giant row', () => {
+  const source = makePhotos([3.33, 0.6434, 3.3])
+  const layout = masonry(source, 390, 2)
+  assert.deepEqual(
+    layout.tiles.map((tile) => tile.photo.id),
+    source.map((photo) => photo.id),
+  )
+  const portrait = layout.tiles[1]
+  assert.ok(portrait.height < 300, 'not a 606px-tall full-width portrait')
+  assert.ok(portrait.width >= 110, 'not a paper-thin strip')
+  assert.ok(portrait.x > 0, 'bounded, centered exception when neighbors cannot share a healthy row')
+})
+
+const manifest = JSON.parse(
+  readFileSync(new URL('../docs/photo-manifest.json', import.meta.url), 'utf8'),
+) as { photos: { width: number; height: number }[] }
+const realPhotos = makePhotos(manifest.photos.map((photo) => photo.width / photo.height))
+
+test('real gallery has balanced visible areas at all required widths and densities', () => {
+  for (const width of [360, 390, 430, 768, 1024, 1280, 1440])
+    for (const density of [1, 2, 3]) {
+      const { tiles } = masonry(realPhotos, width, density)
+      assert.deepEqual(
+        tiles.map((tile) => tile.photo.id),
+        realPhotos.map((photo) => photo.id),
+      )
+      const areas = tiles.map((tile) => tile.width * tile.height).sort((a, b) => a - b)
+      const spread = areas.at(-1)! / areas[0]
+      const centralSpread =
+        areas[Math.floor(areas.length * 0.9)] / areas[Math.floor(areas.length * 0.1)]
+      assert.ok(spread < 10, `${width}/${density}: max/min area ${spread}`)
+      assert.ok(centralSpread < 4, `${width}/${density}: p90/p10 area ${centralSpread}`)
+      const rows = new Map<number, number>()
+      for (const tile of tiles) rows.set(tile.y, tile.x + tile.width)
+      for (const right of rows.values())
+        assert.ok(Math.abs(right - width) < 1e-6, 'real rows remain rectangular')
+    }
+})
+
+test('pagination preserves committed rows and emits every new photo once', () => {
+  for (const width of [390, 768, 1440]) {
+    let source = realPhotos.slice(0, 24)
+    let layout = masonry(source, width)
+    for (const end of [48, 70]) {
+      const next = realPhotos.slice(0, end)
+      const rows = [...new Set(layout.tiles.map((tile) => tile.y))]
+      const frozen = layout.tiles.filter((tile) => tile.y < rows.at(-2)!)
+      const updated = appendMasonry(layout, source, next, width)
+      assert.deepEqual(updated.tiles.slice(0, frozen.length), frozen)
+      assert.deepEqual(
+        updated.tiles.map((tile) => tile.key),
+        next.map((photo) => photo.id),
+      )
+      for (const tile of updated.tiles)
+        assert.ok(tile.x >= 0 && tile.x + tile.width <= width + 1e-6)
+      source = next
+      layout = updated
+    }
+  }
+})
+
+test('layout options can override one nested field without discarding other defaults', () => {
+  const opts = mergeJustifyOptions(2, { weights: { area: 3 }, soft: { min: 100 } })
+  assert.equal(opts.weights.area, 3)
+  assert.equal(opts.weights.flow, DEFAULT_JUSTIFY_OPTIONS[2].weights.flow)
+  assert.equal(opts.soft.max, DEFAULT_JUSTIFY_OPTIONS[2].soft.max)
+  assert.equal(opts.soft.min, 100)
 })

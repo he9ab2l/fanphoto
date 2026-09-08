@@ -12,6 +12,7 @@
     "build": "pnpm typecheck && pnpm --filter @fanphoto/client build && node scripts/build-server.mjs",
     "typecheck": "tsc -p apps/server/tsconfig.json && tsc -p apps/client/tsconfig.json",
     "test": "node --import tsx --test tests/*.test.ts",
+    "test:ui": "node tools/verify-browser.mjs",
     "start": "node apps/server/dist/server.mjs",
     "setup": "tsx scripts/setup.ts",
     "photos:import": "tsx scripts/import.ts",
@@ -24,6 +25,7 @@
     "@types/node": "^24.3.0",
     "esbuild": "^0.25.9",
     "prettier": "^3.6.2",
+    "playwright-core": "^1.55.0",
     "tsx": "^4.20.5",
     "typescript": "~5.9.2"
   }

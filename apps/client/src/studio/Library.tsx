@@ -12,13 +12,12 @@ import {
   EmptyState,
   ErrorState,
   IconButton,
-  Input,
   Modal,
   Radio,
   RadioGroup,
-  SelectField,
   Spinner,
 } from '../ui/primitives'
+import { Input, SelectField } from '../ui/fields'
 import { Icon } from '../ui/icons'
 import { PhotoEditor } from './PhotoEditor'
 

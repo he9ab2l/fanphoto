@@ -1,4 +1,4 @@
-import { chromium } from '@playwright/test'
+import { chromium } from 'playwright-core'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import assert from 'node:assert/strict'
@@ -38,7 +38,7 @@ try {
           localStorage.setItem('fanphoto.preferences', JSON.stringify({ theme, density: 2 })),
         theme,
       )
-      for (const mode of ['flat', 'cylinder', 'sphere']) {
+      for (const mode of ['flat', 'surround']) {
         await page.goto(`${origin}/?view=${mode}`, { waitUntil: 'networkidle' })
         await page.waitForSelector(
           mode === 'flat' ? '.photo-tile' : '.scene-tile[aria-hidden="false"]',

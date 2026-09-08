@@ -3,6 +3,9 @@
 所有 JSON 接口前缀 `/api/v1`。旧 `/api/photos`、`/api/auth/*` 等不提供兼容。
 契约来源：`packages/contracts/src/index.ts`。
 
+较大的 JSON 响应按 `Accept-Encoding` 压缩，字段契约不变且仍为 `no-store`。
+媒体授权在 ETag 判断之前执行；撤回公开后的缓存请求同样不能绕过可见性检查。
+
 错误响应统一为 `{ "error": { "code": "...", "message": "..." } }`，同时返回相应 HTTP 状态。
 不要只判断 HTTP 200；上传新建为 201，重复导入为 200。
 

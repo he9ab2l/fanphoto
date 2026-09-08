@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path'
 export type SqlValue = string | number | null
 export class Database {
   readonly connection: DatabaseSync
+  private readonly statements = new Map<string, ReturnType<DatabaseSync['prepare']>>()
   constructor(path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
     this.connection = new DatabaseSync(path)
@@ -14,14 +15,22 @@ export class Database {
       'PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;',
     )
   }
+  private prepare(sql: string) {
+    const cached = this.statements.get(sql)
+    if (cached) return cached
+    const statement = this.connection.prepare(sql)
+    if (this.statements.size >= 128) this.statements.delete(this.statements.keys().next().value!)
+    this.statements.set(sql, statement)
+    return statement
+  }
   get<T>(sql: string, values: SqlValue[] = []): T | undefined {
-    return this.connection.prepare(sql).get(...values) as T | undefined
+    return this.prepare(sql).get(...values) as T | undefined
   }
   all<T>(sql: string, values: SqlValue[] = []): T[] {
-    return this.connection.prepare(sql).all(...values) as T[]
+    return this.prepare(sql).all(...values) as T[]
   }
   run(sql: string, values: SqlValue[] = []) {
-    return this.connection.prepare(sql).run(...values)
+    return this.prepare(sql).run(...values)
   }
   transaction<T>(operation: () => T): T {
     this.connection.exec('BEGIN IMMEDIATE')
@@ -55,9 +64,11 @@ export class Database {
         this.connection.exec(sql)
         this.run('INSERT INTO schema_versions VALUES (?,?,?)', [name, checksum, Date.now()])
       })
+      this.statements.clear()
     }
   }
   close() {
+    this.statements.clear()
     this.connection.close()
   }
 }

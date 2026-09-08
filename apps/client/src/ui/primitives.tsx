@@ -1,16 +1,14 @@
-import { forwardRef, useId, useState, type ComponentProps, type ReactNode } from 'react'
+import { forwardRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { Button as BaseButton } from '@base-ui/react/button'
-import { Input } from '@base-ui/react/input'
 import { Dialog } from '@base-ui/react/dialog'
 import { AlertDialog } from '@base-ui/react/alert-dialog'
-import { Select } from '@base-ui/react/select'
-import { Switch } from '@base-ui/react/switch'
 import { Radio } from '@base-ui/react/radio'
 import { RadioGroup } from '@base-ui/react/radio-group'
+import { Tooltip } from '@base-ui/react/tooltip'
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { Icon, type IconName } from './icons'
-export { Input, Radio, RadioGroup }
+export { Radio, RadioGroup }
 export const cn = (...values: Parameters<typeof clsx>) => twMerge(clsx(...values))
 
 type ButtonProps = Omit<ComponentProps<typeof BaseButton>, 'className'> & {
@@ -37,18 +35,28 @@ export const IconButton = forwardRef<
     label: string
     active?: boolean
   }
->(function IconButton({ icon, label, active, className, ...props }, ref) {
+>(function IconButton({ icon, label, active, className, title, ...props }, ref) {
   return (
-    <Button
-      ref={ref}
-      aria-label={label}
-      title={label}
-      aria-pressed={active}
-      className={cn('icon-button', active && 'is-active', className)}
-      {...props}
-    >
-      <Icon name={icon} />
-    </Button>
+    <Tooltip.Root>
+      <Tooltip.Trigger
+        render={
+          <Button
+            ref={ref}
+            aria-label={label}
+            aria-pressed={active}
+            className={cn('icon-button', active && 'is-active', className)}
+            {...props}
+          />
+        }
+      >
+        <Icon name={icon} />
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Positioner className="tooltip-positioner" sideOffset={8}>
+          <Tooltip.Popup className="tooltip">{title || label}</Tooltip.Popup>
+        </Tooltip.Positioner>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   )
 })
 export function Spinner({ label = '正在加载' }: { label?: string }) {
@@ -80,10 +88,11 @@ export function EmptyState({
 export function ErrorState({ error, retry }: { error: unknown; retry?: () => void }) {
   return (
     <div className="error-state" role="alert">
-      <Icon name="info" />
+      <Icon name="error" />
       <p>{error instanceof Error ? error.message : '加载失败，请重试'}</p>
       {retry && (
         <Button variant="outline" onClick={retry}>
+          <Icon name="refresh" size={17} />
           重试
         </Button>
       )}
@@ -104,79 +113,6 @@ export function Field({
       <span className="field-label">{label}</span>
       {children}
       {hint && <span className="field-hint">{hint}</span>}
-    </label>
-  )
-}
-export function SelectField({
-  label,
-  value,
-  items,
-  onChange,
-  compact = false,
-}: {
-  label: string
-  value: string
-  items: { value: string; label: string }[]
-  onChange: (value: string) => void
-  compact?: boolean
-}) {
-  return (
-    <Select.Root
-      items={items}
-      value={value}
-      onValueChange={(next) => {
-        if (next !== null) onChange(next)
-      }}
-    >
-      <div className={cn('select-field', compact && 'select-field--compact')}>
-        <Select.Label className={compact ? 'sr-only' : 'field-label'}>{label}</Select.Label>
-        <Select.Trigger className="select-trigger" aria-label={label}>
-          <Select.Value />
-          <Select.Icon>
-            <Icon name="down" size={16} />
-          </Select.Icon>
-        </Select.Trigger>
-      </div>
-      <Select.Portal>
-        <Select.Positioner className="select-positioner" sideOffset={6}>
-          <Select.Popup className="select-popup material">
-            <Select.List>
-              {items.map((item) => (
-                <Select.Item className="select-item" value={item.value} key={item.value}>
-                  <Select.ItemText>{item.label}</Select.ItemText>
-                  <Select.ItemIndicator>
-                    <Icon name="check" size={17} />
-                  </Select.ItemIndicator>
-                </Select.Item>
-              ))}
-            </Select.List>
-          </Select.Popup>
-        </Select.Positioner>
-      </Select.Portal>
-    </Select.Root>
-  )
-}
-export function ToggleField({
-  label,
-  hint,
-  checked,
-  onChange,
-}: {
-  label: string
-  hint?: string
-  checked: boolean
-  onChange: (checked: boolean) => void
-}) {
-  const id = useId()
-  return (
-    <label className="toggle-field" htmlFor={id}>
-      <span>
-        <span className="field-label">{label}</span>
-        {hint && <span className="field-hint">{hint}</span>}
-      </span>
-      <Switch.Root id={id} className="switch" checked={checked} onCheckedChange={onChange}>
-        <Switch.Thumb className="switch-thumb" />
-      </Switch.Root>
     </label>
   )
 }

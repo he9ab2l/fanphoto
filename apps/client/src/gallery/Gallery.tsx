@@ -1,8 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { motion } from 'motion/react'
-import type { PhotoSummary } from '@fanphoto/contracts'
-import { usePhotos, useSite } from '../lib/api'
+import { useQueryClient } from '@tanstack/react-query'
+import type { PhotoDetail, PhotoSummary } from '@fanphoto/contracts'
+import { api, usePhotos, useSite } from '../lib/api'
 import { apiFilters } from '../lib/photos'
 import { usePreferences } from '../lib/preferences'
 import { Button, EmptyState, ErrorState, Spinner } from '../ui/primitives'
@@ -10,18 +10,25 @@ import { Masonry } from '../vendor/Masonry'
 import { GalleryControls } from './Controls'
 import type { Pose, WallMode } from './geometry'
 const Immersive = lazy(() =>
-  import('../vendor/DomeGallery').then((module) => ({ default: module.DomeGallery })),
+  import('../vendor/SurroundGallery').then((module) => ({ default: module.SurroundGallery })),
 )
 
-export default function Gallery({ paused = false }: { paused?: boolean }) {
+export default function Gallery({
+  paused = false,
+  deferInitialLoad = false,
+}: {
+  paused?: boolean
+  deferInitialLoad?: boolean
+}) {
   const [search, setSearch] = useSearchParams(),
     location = useLocation(),
     navigate = useNavigate()
   const rawMode = search.get('view'),
-    mode: WallMode = rawMode === 'cylinder' || rawMode === 'sphere' ? rawMode : 'flat'
+    mode: WallMode = rawMode === 'surround' ? 'surround' : 'flat'
   const filters = useMemo(() => apiFilters(search), [search])
-  const query = usePhotos(filters),
+  const query = usePhotos(filters, false, !deferInitialLoad),
     { preferences } = usePreferences()
+  const client = useQueryClient()
   const site = useSite()
   useEffect(() => {
     if (!paused) document.title = site.data?.site.title || 'FanPhoto'
@@ -70,10 +77,21 @@ export default function Gallery({ paused = false }: { paused?: boolean }) {
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
   }, [paused])
-  const open = (photo: PhotoSummary) => {
+  const intent = (photo: PhotoSummary) => {
+    void import('./PhotoDialog')
+    const filterQuery = new URLSearchParams(
+      Object.entries(filters).filter(([, value]) => value),
+    ).toString()
+    void client.prefetchQuery({
+      queryKey: ['photo', photo.id, filterQuery],
+      queryFn: ({ signal }) => api<PhotoDetail>(`/photos/${photo.id}?${filterQuery}`, { signal }),
+      staleTime: 30000,
+    })
+  }
+  const open = (photo: PhotoSummary, previewUrl?: string) => {
     const params = new URLSearchParams(search)
     navigate(`/photo/${photo.id}${params.size ? `?${params}` : ''}`, {
-      state: { background: location },
+      state: { background: location, preview: { photo, url: previewUrl } },
     })
   }
   const identity = JSON.stringify(filters)
@@ -82,7 +100,7 @@ export default function Gallery({ paused = false }: { paused?: boolean }) {
       <h1 className="sr-only">{site.data?.site.title || 'FanPhoto'} 照片墙</h1>
       {query.isPending ? (
         <div className="gallery-pending">
-          <Spinner label="正在载入照片" />
+          {!deferInitialLoad && <Spinner label="正在载入照片" />}
         </div>
       ) : query.isError && !photos.length ? (
         <div className="gallery-empty">
@@ -104,7 +122,13 @@ export default function Gallery({ paused = false }: { paused?: boolean }) {
         </div>
       ) : mode === 'flat' ? (
         <div className="flat-wall">
-          <Masonry photos={photos} density={preferences.density} onOpen={open} />
+          <Masonry
+            photos={photos}
+            density={preferences.density}
+            onOpen={open}
+            onIntent={intent}
+            paused={paused}
+          />
           <div ref={sentinel} className="load-sentinel">
             {query.isFetchingNextPage && <Spinner label="加载更多照片" />}
             {query.isFetchNextPageError && (
@@ -120,20 +144,14 @@ export default function Gallery({ paused = false }: { paused?: boolean }) {
             </div>
           }
         >
-          <motion.div
-            className="immersive-container"
-            key={`${mode}:${identity}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.18 }}
-          >
+          <div className="immersive-container" key={`${mode}:${identity}`}>
             <Immersive
               photos={photos}
-              mode={mode}
               density={preferences.density}
               paused={paused}
               pose={pose}
               onOpen={open}
+              onIntent={intent}
               onExplore={loadMore}
             />
             {query.isFetchNextPageError && (
@@ -141,7 +159,7 @@ export default function Gallery({ paused = false }: { paused?: boolean }) {
                 <Button onClick={() => void query.fetchNextPage()}>重新加载更多照片</Button>
               </div>
             )}
-          </motion.div>
+          </div>
         </Suspense>
       )}
       <GalleryControls

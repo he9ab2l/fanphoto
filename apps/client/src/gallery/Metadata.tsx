@@ -1,4 +1,5 @@
 import type { Photo } from '@fanphoto/contracts'
+import '../styles/metadata.css'
 import { captureLabel, exposure, formatBytes } from '../lib/photos'
 import { Icon } from '../ui/icons'
 
@@ -8,7 +9,7 @@ function Facts({ rows }: { rows: [string, string | number | null | undefined][] 
       {rows.map(([label, value]) => (
         <div key={label}>
           <dt>{label}</dt>
-          <dd>{value || '未记录'}</dd>
+          <dd>{value === '' || value == null ? '未记录' : value}</dd>
         </div>
       ))}
     </dl>
@@ -18,7 +19,15 @@ export function Metadata({ photo }: { photo: Photo }) {
   const exif = photo.exif
   return (
     <div className="metadata">
-      {photo.description && <p className="photo-description">{photo.description}</p>}
+      {photo.description && (
+        <section>
+          <h3>
+            <Icon name="description" size={17} />
+            图片说明
+          </h3>
+          <p className="photo-description">{photo.description}</p>
+        </section>
+      )}
       <section>
         <h3>
           <Icon name="time" size={17} />
@@ -77,7 +86,10 @@ export function Metadata({ photo }: { photo: Photo }) {
       </section>
       {(exif.artist || exif.copyright) && (
         <section>
-          <h3>作者与版权</h3>
+          <h3>
+            <Icon name="copyright" size={17} />
+            作者与版权
+          </h3>
           <Facts
             rows={[
               ...(exif.artist ? [['作者', exif.artist] as [string, string]] : []),
@@ -87,7 +99,10 @@ export function Metadata({ photo }: { photo: Photo }) {
         </section>
       )}
       <section>
-        <h3>标签</h3>
+        <h3>
+          <Icon name="tag" size={17} />
+          标签
+        </h3>
         {photo.tags.length ? (
           <div className="tags">
             {photo.tags.map((tag) => (
@@ -102,10 +117,14 @@ export function Metadata({ photo }: { photo: Photo }) {
       </section>
       {photo.attribution && (
         <section className="attribution">
-          <h3>来源与许可</h3>
+          <h3>
+            <Icon name="link" size={17} />
+            来源与许可
+          </h3>
           <p>{photo.attribution.author}</p>
           <a href={photo.attribution.sourceUrl} target="_blank" rel="noreferrer">
             查看作品来源
+            <Icon name="external" size={15} />
           </a>
           {photo.attribution.licenseUrl ? (
             <a href={photo.attribution.licenseUrl} target="_blank" rel="noreferrer">

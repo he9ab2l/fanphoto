@@ -1,4 +1,6 @@
 import { build } from 'esbuild'
+import { compressClient } from './compress-client.mjs'
+console.log(`Prepared Brotli/gzip for ${await compressClient()} client files`)
 await build({
   entryPoints: ['apps/server/src/index.ts'],
   bundle: true,

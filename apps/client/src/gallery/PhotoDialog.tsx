@@ -1,48 +1,83 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import type { CSSProperties } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@base-ui/react/dialog'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { Drawer } from '@base-ui/react/drawer'
+import { motion, useReducedMotion } from 'motion/react'
+import { useDrag } from '@use-gesture/react'
+import '../styles/viewer.css'
 import { toast } from 'sonner'
-import type { PhotoDetail } from '@fanphoto/contracts'
-import { api, useSite } from '../lib/api'
-import { apiFilters, captureLabel } from '../lib/photos'
-import { Button, ErrorState, IconButton, Spinner } from '../ui/primitives'
+import type { PhotoDetail, PhotoPage, PhotoSummary } from '@fanphoto/contracts'
+import { api, RequestError, useSite } from '../lib/api'
+import { apiFilters } from '../lib/photos'
+import { imageAsset, imageQuality } from '../lib/image-loading'
+import { Button, ErrorState, IconButton, cn } from '../ui/primitives'
+import { DetailImage } from '../ui/PhotoImage'
 import { Icon } from '../ui/icons'
-import { Metadata } from './Metadata'
+import { GlassSurface } from '../vendor/GlassSurface'
+import { PhotoInfoBody, PhotoInfoHeader } from './PhotoInfo'
+import { VIEWER, viewerLayout, type InfoState, type Viewport } from './viewer-layout'
 
-/** 信息栏形态：collapsed=收起 / partial=半展（手机底部面板）/ full=完整展开 */
-type InfoState = 'collapsed' | 'partial' | 'full'
+function useViewport(): Viewport {
+  const read = () => {
+    const style = getComputedStyle(document.documentElement)
+    return {
+      width: window.innerWidth,
+      height: window.visualViewport?.height || window.innerHeight,
+      safeTop: parseFloat(style.getPropertyValue('--safe-top')) || 0,
+      safeBottom: parseFloat(style.getPropertyValue('--safe-bottom')) || 0,
+    }
+  }
+  const [viewport, setViewport] = useState(read)
+  useEffect(() => {
+    const update = () => setViewport(read())
+    window.addEventListener('resize', update)
+    window.visualViewport?.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener('resize', update)
+    }
+  }, [])
+  return viewport
+}
 
-/** 布局切换宽度：低于此值使用手机端底部面板，避免右侧信息栏被压窄 */
-const MOBILE_BREAKPOINT = 900
-/** 桌面信息栏宽度与弹窗几何参数，集中一处便于调试 */
-const INFO_WIDTH = 320
-const SHELL_PAD_X = 24
-const SHELL_PAD_Y = 20
-const SHELL_GAP = 24
-const SHELL_MAX_WIDTH = 1400
-const SHELL_MARGIN = 88
-const SHELL_MARGIN_Y = 96
-
-export default function PhotoDialog() {
-  const { id } = useParams(),
-    location = useLocation(),
-    navigate = useNavigate()
-  const isMobile = () => window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
+export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) {
+  const { id } = useParams()
+  const location = useLocation(),
+    navigate = useNavigate(),
+    client = useQueryClient()
+  const site = useSite(),
+    reduced = useReducedMotion(),
+    viewport = useViewport()
+  const mobile = viewport.width <= VIEWER.breakpoint
   const [open, setOpen] = useState(true)
-  const [mobile, setMobile] = useState(isMobile)
-  const [info, setInfo] = useState<InfoState>(() => (isMobile() ? 'collapsed' : 'full'))
-  const [viewport, setViewport] = useState(() => ({
-    w: window.innerWidth,
-    h: window.innerHeight,
-  }))
-  const [loaded, setLoaded] = useState(''),
-    [failed, setFailed] = useState(''),
-    [retry, setRetry] = useState(0)
-  const reduced = useReducedMotion(),
-    site = useSite()
-  const closeButton = useRef<HTMLButtonElement>(null)
+  const [readyPhoto, setReadyPhoto] = useState('')
+  const imageReady = useCallback(
+    (photoId: string) => {
+      setReadyPhoto(photoId)
+      onReady?.()
+    },
+    [onReady],
+  )
+  const [info, setInfo] = useState<InfoState>(() => (mobile ? 'collapsed' : 'full'))
+  const shell = useRef<HTMLDivElement>(null),
+    stage = useRef<HTMLDivElement>(null)
+  const closeButton = useRef<HTMLButtonElement>(null),
+    infoButton = useRef<HTMLButtonElement>(null)
+  const grip = useRef<HTMLButtonElement>(null),
+    desktopInfo = useRef<HTMLElement>(null)
+  const desktopScroll = useRef<HTMLDivElement>(null),
+    mobileScroll = useRef<HTMLDivElement>(null)
+  const sheetPopup = useRef<HTMLDivElement>(null),
+    sheetFooter = useRef<HTMLElement>(null)
+  const sheetViewerClose = useRef<HTMLDivElement>(null)
+  const initialPhotoId = useRef(id)
+  const returnFocus = useRef<HTMLElement | null>(
+    document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+      ? document.activeElement
+      : null,
+  )
   const filters = useMemo(
     () =>
       new URLSearchParams(
@@ -55,133 +90,214 @@ export default function PhotoDialog() {
   const query = useQuery({
     queryKey: ['photo', id, filters],
     queryFn: ({ signal }) => api<PhotoDetail>(`/photos/${id}?${filters}`, { signal }),
+    staleTime: 30000,
   })
-  const photo = query.data?.photo
-  const close = () =>
-    location.state?.background ? navigate(-1) : navigate('/' + location.search, { replace: true })
-  const turn = (next?: string | null) => {
-    if (next) navigate(`/photo/${next}${location.search}`, { replace: true, state: location.state })
-  }
-  /** 桌面端信息栏展开 ⇄ 收起；手机端信息入口 ⇄ 底部面板 */
-  const toggleInfo = () =>
-    setInfo((value) => {
-      if (mobile) return value === 'collapsed' ? 'partial' : 'collapsed'
-      return value === 'collapsed' ? 'full' : 'collapsed'
-    })
+  const preview = location.state?.preview as { photo: PhotoSummary; url?: string } | undefined
+  const cachedSummary = useMemo(() => {
+    if (preview && preview.photo.id === id) return preview.photo
+    for (const [, data] of client.getQueriesData<{ pages: PhotoPage[] }>({
+      queryKey: ['photos', false],
+    })) {
+      const found = data?.pages.flatMap((page) => page.items).find((photo) => photo.id === id)
+      if (found) return found
+    }
+    return undefined
+  }, [id, preview, client])
+  const forbidden = query.error instanceof RequestError && [403, 404].includes(query.error.status)
+  const photo = forbidden ? undefined : query.data?.photo
+  const summary = forbidden ? undefined : photo || cachedSummary
+  const layout = viewerLayout(viewport, summary ? summary.width / summary.height : 1.5, info)
+  const expanded = info !== 'collapsed'
+  const locked = mobile && expanded
+  useLayoutEffect(() => {
+    const popup = sheetPopup.current,
+      footer = sheetFooter.current
+    if (!mobile || !expanded || !popup || !footer) return
+    // Drawer registers its offsets as non-inheriting CSS properties. Mirror
+    // only its inline lengths into the footer transform: no layout reads,
+    // inherited animated variables, extra gesture engine or permanent rAF.
+    const sync = () => {
+      const snap = parseFloat(popup.style.getPropertyValue('--drawer-snap-point-offset')) || 0
+      const swipe = parseFloat(popup.style.getPropertyValue('--drawer-swipe-movement-y')) || 0
+      footer.style.transform = `translateY(${-Math.max(0, snap + swipe)}px)`
+      if (sheetViewerClose.current)
+        sheetViewerClose.current.style.transform = `translateY(${-(snap + swipe)}px)`
+    }
+    sync()
+    const observer = new MutationObserver(sync)
+    observer.observe(popup, { attributes: true, attributeFilter: ['style'] })
+    return () => observer.disconnect()
+  }, [mobile, expanded])
+  const source = summary
+    ? imageAsset(
+        summary,
+        viewport.width,
+        viewport.height - VIEWER.phoneControls * 2,
+        imageQuality(),
+      ).url
+    : ''
+  const close = useCallback(() => {
+    if (location.state?.background) navigate(-1)
+    else navigate('/' + location.search, { replace: true })
+  }, [location.state, location.search, navigate])
+  const turn = useCallback(
+    (next?: string | null) => {
+      if (!next || locked) return
+      navigate(`/photo/${next}${location.search}`, { replace: true, state: location.state })
+    },
+    [locked, location.search, location.state, navigate],
+  )
+  const toggleInfo = useCallback(() => {
+    if (
+      !mobile &&
+      expanded &&
+      (desktopInfo.current?.contains(document.activeElement) ||
+        document.activeElement?.closest('.detail-title-popover'))
+    )
+      infoButton.current?.focus({ preventScroll: true })
+    setInfo((value) => (value === 'collapsed' ? (mobile ? 'partial' : 'full') : 'collapsed'))
+  }, [mobile, expanded])
   useEffect(() => {
-    if (photo) document.title = `${photo.title} · ${site.data?.site.title || 'FanPhoto'}`
+    if (!mobile && info === 'partial') setInfo('full')
+  }, [mobile, info])
+  useEffect(() => {
+    if (summary) document.title = `${summary.title} · ${site.data?.site.title || 'FanPhoto'}`
     return () => {
       document.title = site.data?.site.title || 'FanPhoto'
     }
-  }, [photo?.id, photo?.title, site.data?.site.title])
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`)
-    const onChange = (event: MediaQueryListEvent) => {
-      setMobile(event.matches)
-      // 手机端三种形态都合法，保持现状；桌面端没有 partial，回落到 full
-      setInfo((value) => (event.matches ? value : value === 'partial' ? 'full' : value))
-    }
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [])
-  useEffect(() => {
-    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight })
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
+  }, [summary?.title, site.data?.site.title])
+  useLayoutEffect(() => {
+    // Switching photo starts its metadata at the top. Toggling the panel does
+    // not remount it or touch its scroll position.
+    if (desktopScroll.current) desktopScroll.current.scrollTop = 0
+    if (mobileScroll.current) mobileScroll.current.scrollTop = 0
+  }, [id])
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement).closest('input,textarea,select,[role="listbox"]')) return
-      if (event.key === 'ArrowLeft') {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        (event.target instanceof Element &&
+          event.target.closest(
+            'input,textarea,select,[contenteditable="true"],[role="listbox"],[role="menu"],[role="slider"]',
+          ))
+      )
+        return
+      if (!locked && event.key === 'ArrowLeft') {
         event.preventDefault()
         turn(query.data?.neighbors.previous)
       }
-      if (event.key === 'ArrowRight') {
+      if (!locked && event.key === 'ArrowRight') {
         event.preventDefault()
         turn(query.data?.neighbors.next)
       }
-      if (event.key.toLowerCase() === 'i') toggleInfo()
+      if (event.key.toLowerCase() === 'i') {
+        event.preventDefault()
+        toggleInfo()
+      }
     }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
-    // toggleInfo 为当次渲染闭包，依赖已覆盖其内部读取的 mobile/info
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query.data?.neighbors.previous, query.data?.neighbors.next, mobile, info])
+  }, [locked, turn, toggleInfo, query.data?.neighbors.previous, query.data?.neighbors.next])
+  useEffect(() => {
+    if (!photo || readyPhoto !== photo.id) return
+    const connection = (
+      navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }
+    ).connection
+    if (connection?.saveData || connection?.effectiveType === '2g') return
+    const controller = new AbortController()
+    for (const neighbor of [query.data?.neighbors.previous, query.data?.neighbors.next]) {
+      if (!neighbor) continue
+      void client
+        .fetchQuery({
+          queryKey: ['photo', neighbor, filters],
+          queryFn: ({ signal }) => api<PhotoDetail>(`/photos/${neighbor}?${filters}`, { signal }),
+          staleTime: 30000,
+        })
+        .then((detail) => {
+          if (controller.signal.aborted) return
+          const image = new Image()
+          image.decoding = 'async'
+          image.fetchPriority = 'low'
+          image.src = detail.photo.assets.md.url
+        })
+        .catch(() => {})
+    }
+    return () => controller.abort()
+  }, [
+    photo?.id,
+    readyPhoto,
+    query.data?.neighbors.previous,
+    query.data?.neighbors.next,
+    filters,
+    client,
+  ])
+  useDrag(
+    ({ last, movement: [x, y], velocity: [vx], direction: [dx], tap, event }) => {
+      if (!last || tap || locked || !mobile || Math.abs(y) > Math.abs(x) * 0.7) return
+      if (event.target instanceof Element && event.target.closest('button,a')) return
+      if (Math.abs(x) > 60 || (Math.abs(x) > 20 && vx > 0.5))
+        turn(dx < 0 ? query.data?.neighbors.next : query.data?.neighbors.previous)
+    },
+    {
+      target: stage,
+      enabled: mobile && !locked,
+      axis: 'x',
+      filterTaps: true,
+      threshold: 10,
+      pointer: { touch: true },
+    },
+  )
+
   const share = async () => {
     try {
       const url = `${window.location.origin}/photo/${id}`
       if (navigator.share && navigator.maxTouchPoints > 0)
-        await navigator.share({ title: photo?.title, url })
+        await navigator.share({ title: summary?.title, url })
       else {
         await navigator.clipboard.writeText(url)
         toast('照片链接已复制')
       }
     } catch (error) {
-      if ((error as Error).name !== 'AbortError') toast.error('请复制地址栏中的照片链接')
+      if ((error as Error).name !== 'AbortError')
+        toast.error('分享未完成，请复制地址栏中的照片链接')
     }
   }
-  /** 桌面端图片显示尺寸：宽度与高度双约束，保持原始比例、完整显示不裁切 */
-  const expanded = !mobile && info !== 'collapsed'
-  const shellWidth = Math.min(SHELL_MAX_WIDTH, viewport.w - SHELL_MARGIN)
-  const stageWidth = Math.max(
-    0,
-    shellWidth - SHELL_PAD_X * 2 - (expanded ? INFO_WIDTH + SHELL_GAP : 0),
+  const actions = (
+    <>
+      <Button className="detail-share" disabled={!summary} onClick={() => void share()}>
+        <Icon name="share" size={18} />
+        分享
+      </Button>
+      {site.data?.site.allowDownloads && summary && (
+        <a
+          className="button button--solid detail-download"
+          href={`/api/v1/photos/${summary.id}/download`}
+        >
+          <Icon name="download" size={18} />
+          下载图片
+        </a>
+      )}
+    </>
   )
-  const maxStageHeight = Math.max(0, viewport.h - SHELL_MARGIN_Y - SHELL_PAD_Y * 2)
-  const fit = useMemo(() => {
-    if (!photo || !stageWidth || !maxStageHeight) return null
-    const ratio = photo.width / photo.height
-    const displayH = Math.min(stageWidth / ratio, maxStageHeight)
-    return { w: displayH * ratio, h: displayH }
-  }, [photo, stageWidth, maxStageHeight])
-  const shellHeight = fit
-    ? Math.max(320, Math.min(Math.round(fit.h + SHELL_PAD_Y * 2), viewport.h - SHELL_MARGIN_Y))
-    : 560
-  /** 手机底部面板：拖 grip 上滑展开 / 下滑收起，松手按位移与速度投影目标档位 */
-  const gripState = useRef({ y: 0, t: 0, vy: 0, active: false })
-  const [gripY, setGripY] = useState(0)
-  const onGripDown = (event: React.PointerEvent) => {
-    gripState.current = { y: event.clientY, t: performance.now(), vy: 0, active: true }
-    event.currentTarget.setPointerCapture(event.pointerId)
+  const infoError = query.isError ? (
+    <ErrorState error={query.error} retry={() => void query.refetch()} />
+  ) : undefined
+  const restoreFocus = () => {
+    if (returnFocus.current?.isConnected) return returnFocus.current
+    return (
+      document.querySelector<HTMLElement>(`[data-photo-id="${initialPhotoId.current}"]`) ||
+      document.querySelector<HTMLElement>('.brand-trigger') ||
+      false
+    )
   }
-  const onGripMove = (event: React.PointerEvent) => {
-    if (!gripState.current.active) return
-    const now = performance.now(),
-      y = event.clientY
-    gripState.current.vy = (y - gripState.current.y) / Math.max(1, now - gripState.current.t)
-    setGripY(Math.max(-140, Math.min(140, y - gripState.current.y)))
-  }
-  const onGripUp = () => {
-    if (!gripState.current.active) return
-    gripState.current.active = false
-    const pulled = gripY,
-      fast = Math.abs(gripState.current.vy) > 1.2
-    setGripY(0)
-    if (fast ? gripState.current.vy < 0 : pulled < -60)
-      setInfo((value) => (value === 'collapsed' ? 'partial' : 'full'))
-    else if (fast ? gripState.current.vy > 0 : pulled > 60)
-      setInfo((value) => (value === 'full' ? 'partial' : 'collapsed'))
-  }
-  const download = site.data?.site.allowDownloads && (
-    <a
-      className="button button--solid detail-download"
-      href={`/api/v1/photos/${photo?.id}/download`}
-    >
-      <Icon name="download" size={17} />
-      下载图片
-    </a>
-  )
-  const shareButton = (
-    <Button variant="quiet" className="detail-share" onClick={() => void share()}>
-      <Icon name="share" size={17} />
-      分享
-    </Button>
-  )
-  const infoVisible = info === 'full' || (mobile && info === 'partial')
   return (
     <Dialog.Root
       open={open}
       onOpenChange={setOpen}
+      disablePointerDismissal={locked}
       onOpenChangeComplete={(value) => {
         if (!value) close()
       }}
@@ -189,177 +305,250 @@ export default function PhotoDialog() {
       <Dialog.Portal>
         <Dialog.Backdrop className="detail-backdrop" />
         <Dialog.Popup
-          className="detail-shell material"
+          ref={shell}
+          className="detail-shell"
           data-testid="photo-detail"
+          data-info={info}
           initialFocus={closeButton}
-          style={mobile ? undefined : { height: shellHeight }}
+          finalFocus={restoreFocus}
+          style={{ width: layout.shellWidth, height: layout.shellHeight }}
         >
-          <Dialog.Title className="sr-only">照片详情</Dialog.Title>
-          {query.isPending ? (
-            <div className="detail-loading">
-              <Spinner label="读取照片详情" />
-            </div>
-          ) : query.isError ? (
-            <ErrorState error={query.error} retry={() => void query.refetch()} />
-          ) : (
-            photo && (
-              <>
-                <div
-                  className={`detail-stage ${mobile && info === 'full' ? 'detail-stage--dimmed' : ''}`}
-                  data-testid="detail-image-area"
-                >
-                  {loaded !== photo.id && failed !== photo.id && (
-                    <span className="image-loading">
-                      <Spinner label="载入高清照片" />
-                    </span>
-                  )}
-                  <div
-                    className="detail-photo"
-                    style={mobile ? undefined : { width: fit?.w, height: fit?.h }}
-                  >
-                    <motion.img
-                      key={photo.id}
-                      className={loaded === photo.id ? 'is-loaded' : ''}
-                      src={photo.assets.lg.url + (retry ? `&retry=${retry}` : '')}
-                      width={photo.width}
-                      height={photo.height}
-                      alt={photo.title}
-                      draggable={false}
-                      onLoad={() => setLoaded(photo.id)}
-                      onError={() => setFailed(photo.id)}
-                    />
-                  </div>
-                  {failed === photo.id && (
-                    <ErrorState
-                      error={new Error('高清图暂时无法载入')}
-                      retry={() => {
-                        setFailed('')
-                        setRetry(Date.now())
-                      }}
-                    />
-                  )}
-                  {!mobile && !expanded && (
-                    <div className="detail-float-actions">
-                      <div className="glass-surface">
-                        <div className="glass-surface__content">
-                          {shareButton}
-                          {download}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div className="detail-nav detail-nav--prev">
-                    <IconButton
-                      icon="left"
-                      label="上一张照片"
-                      disabled={!query.data?.neighbors.previous}
-                      onClick={() => turn(query.data?.neighbors.previous)}
-                    />
-                  </div>
-                  <div className="detail-nav detail-nav--next">
-                    <IconButton
-                      icon="right"
-                      label="下一张照片"
-                      disabled={!query.data?.neighbors.next}
-                      onClick={() => turn(query.data?.neighbors.next)}
-                    />
-                  </div>
-                </div>
-                <AnimatePresence initial={false}>
-                  {infoVisible && (
-                    <motion.aside
-                      className={`detail-info${info === 'full' ? ' detail-info--full' : ''}`}
-                      id="photo-information"
-                      aria-label="照片元数据"
-                      initial={
-                        reduced
-                          ? { opacity: 0 }
-                          : mobile
-                            ? { opacity: 0, y: 24 }
-                            : { opacity: 0, x: 16 }
-                      }
-                      animate={
-                        reduced
-                          ? { opacity: 1 }
-                          : mobile
-                            ? { opacity: 1, y: 0 }
-                            : { opacity: 1, x: 0 }
-                      }
-                      exit={
-                        reduced
-                          ? { opacity: 0 }
-                          : mobile
-                            ? { opacity: 0, y: 24 }
-                            : { opacity: 0, x: 16 }
-                      }
-                      transition={{ duration: 0.18 }}
-                    >
-                      <div
-                        className="detail-sheet-grip"
-                        role="button"
-                        tabIndex={0}
-                        aria-label="调整图片信息面板"
-                        onPointerDown={onGripDown}
-                        onPointerMove={onGripMove}
-                        onPointerUp={onGripUp}
-                        onPointerCancel={onGripUp}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault()
-                            toggleInfo()
-                          }
-                        }}
-                        onDragStart={(event) => event.preventDefault()}
-                        style={{ transform: gripY ? `translateY(${gripY}px)` : undefined }}
-                      >
-                        <span className="detail-sheet-grip__bar" />
-                      </div>
-                      <header className="detail-info-header">
-                        <div>
-                          <h2 className="detail-info-title" title={photo.title}>
-                            {photo.title}
-                          </h2>
-                          <p className="detail-info-date">{captureLabel(photo)}</p>
-                        </div>
-                        {mobile && (
-                          <IconButton icon="down" label="收起照片信息" onClick={toggleInfo} />
-                        )}
-                      </header>
-                      {(!mobile || info === 'full') && (
-                        <div className="detail-info-scroll">
-                          <Metadata photo={photo} />
-                        </div>
-                      )}
-                      <footer className="detail-info-footer">
-                        {shareButton}
-                        {download}
-                      </footer>
-                    </motion.aside>
-                  )}
-                </AnimatePresence>
-                {mobile && info === 'collapsed' && (
-                  <button className="detail-sheet-entry" onClick={() => setInfo('partial')}>
-                    <Icon name="info" size={18} />
-                    展开照片信息
-                  </button>
+          <Dialog.Title className="sr-only" render={<span />}>
+            照片详情
+          </Dialog.Title>
+          <div
+            ref={stage}
+            className="detail-stage"
+            data-testid="detail-image-area"
+            inert={locked}
+            style={{ width: layout.stageWidth, height: layout.stageHeight }}
+          >
+            {summary ? (
+              <motion.div
+                className="detail-photo"
+                layout={reduced ? false : 'preserve-aspect'}
+                layoutDependency={`${info}:${viewport.width}:${viewport.height}:${id}`}
+                transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
+                style={{
+                  width: layout.photo.width,
+                  height: layout.photo.height,
+                  left: layout.photo.x,
+                  top: layout.photo.y,
+                }}
+              >
+                <DetailImage
+                  key={summary.id}
+                  photo={summary}
+                  source={source}
+                  onReady={imageReady}
+                  previewUrl={preview?.photo.id === summary.id ? preview.url : undefined}
+                />
+              </motion.div>
+            ) : (
+              <div className="detail-loading" role="status">
+                {query.isError ? (
+                  <ErrorState error={query.error} retry={() => void query.refetch()} />
+                ) : (
+                  <>
+                    <Icon name="photo" size={32} />
+                    <span>正在打开照片</span>
+                  </>
                 )}
-              </>
-            )
-          )}
-          <div className="detail-corner">
-            {!mobile && (
-              <IconButton
-                icon="panel"
-                label={expanded ? '收起照片信息' : '展开照片信息'}
-                aria-expanded={expanded}
-                aria-controls="photo-information"
-                onClick={toggleInfo}
-              />
+              </div>
             )}
-            <Dialog.Close
-              render={<IconButton ref={closeButton} icon="close" label="关闭照片详情" />}
-            />
+            <motion.div
+              className="detail-nav detail-nav--prev"
+              layout={reduced ? false : 'position'}
+              style={{ top: layout.photo.y + layout.photo.height / 2 - VIEWER.navigationSize / 2 }}
+              transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
+            >
+              <GlassSurface>
+                <IconButton
+                  icon="left"
+                  label="上一张照片"
+                  disabled={!query.data?.neighbors.previous || locked}
+                  onClick={() => turn(query.data?.neighbors.previous)}
+                />
+              </GlassSurface>
+            </motion.div>
+            <motion.div
+              className="detail-nav detail-nav--next"
+              layout={reduced ? false : 'position'}
+              style={{ top: layout.photo.y + layout.photo.height / 2 - VIEWER.navigationSize / 2 }}
+              transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
+            >
+              <GlassSurface>
+                <IconButton
+                  icon="right"
+                  label="下一张照片"
+                  disabled={!query.data?.neighbors.next || locked}
+                  onClick={() => turn(query.data?.neighbors.next)}
+                />
+              </GlassSurface>
+            </motion.div>
+            {!mobile && !expanded && summary && (
+              <GlassSurface className="detail-float-actions">{actions}</GlassSurface>
+            )}
           </div>
+          {!mobile && (
+            <motion.aside
+              ref={desktopInfo}
+              id="photo-information"
+              className="detail-info"
+              aria-label="照片信息"
+              inert={!expanded}
+              aria-hidden={!expanded}
+              initial={false}
+              animate={{ x: expanded ? 0 : VIEWER.infoWidth, opacity: expanded ? 1 : 0 }}
+              transition={{ duration: reduced ? 0 : 0.18, ease: 'easeOut' }}
+            >
+              <PhotoInfoHeader photo={summary} active={expanded} />
+              <div ref={desktopScroll} className="detail-info-scroll">
+                <PhotoInfoBody photo={photo}>{infoError}</PhotoInfoBody>
+              </div>
+              <footer className="detail-info-footer">{actions}</footer>
+            </motion.aside>
+          )}
+          {mobile && (
+            <Drawer.Root
+              open={expanded}
+              modal
+              disablePointerDismissal
+              snapPoints={[layout.sheet.partial, layout.sheet.full]}
+              snapPoint={info === 'full' ? layout.sheet.full : layout.sheet.partial}
+              onSnapPointChange={(point) => {
+                // Drawer resets its snap point after closing. That reset must
+                // not turn the controlled, already-closed sheet back on.
+                if (point !== null)
+                  setInfo((current) =>
+                    current === 'collapsed'
+                      ? current
+                      : point === layout.sheet.full
+                        ? 'full'
+                        : 'partial',
+                  )
+              }}
+              onOpenChange={(value, details) => {
+                if (details.reason === 'escape-key') setOpen(false)
+                setInfo(value ? 'partial' : 'collapsed')
+              }}
+            >
+              {!expanded && (
+                <div className="detail-sheet-entry-area">
+                  <Drawer.SwipeArea className="detail-sheet-swipe-area" />
+                  <GlassSurface>
+                    <Drawer.Trigger
+                      render={<Button ref={infoButton} className="detail-sheet-entry" />}
+                    >
+                      <Icon name="info" size={18} />
+                      查看照片信息
+                      <Icon name="up" size={16} />
+                    </Drawer.Trigger>
+                  </GlassSurface>
+                </div>
+              )}
+              <Drawer.Portal keepMounted>
+                <Drawer.Viewport className="detail-sheet-viewport">
+                  <Drawer.Popup
+                    ref={sheetPopup}
+                    className={cn(
+                      'detail-info',
+                      'detail-sheet',
+                      info === 'full' && 'detail-sheet--full',
+                    )}
+                    id="photo-information"
+                    data-info-state={info}
+                    initialFocus={grip}
+                    finalFocus={() => infoButton.current || closeButton.current || false}
+                    style={{ height: layout.sheet.full }}
+                  >
+                    <Drawer.Title className="sr-only" render={<span />}>
+                      照片信息
+                    </Drawer.Title>
+                    <div className="detail-sheet-body">
+                      <div className="detail-sheet-handle">
+                        <Button
+                          ref={grip}
+                          className="detail-sheet-grip"
+                          aria-label={info === 'full' ? '半展开照片信息' : '展开完整照片信息'}
+                          aria-expanded={info === 'full'}
+                          aria-controls="photo-metadata"
+                          onClick={() =>
+                            setInfo((value) => (value === 'full' ? 'partial' : 'full'))
+                          }
+                        >
+                          <span />
+                        </Button>
+                      </div>
+                      <PhotoInfoHeader
+                        photo={summary}
+                        active={expanded}
+                        control={
+                          <Drawer.Close render={<IconButton icon="down" label="收起照片信息" />} />
+                        }
+                      />
+                      <Drawer.Content
+                        ref={mobileScroll}
+                        id="photo-metadata"
+                        className="detail-info-scroll"
+                        inert={info !== 'full'}
+                        aria-hidden={info !== 'full'}
+                      >
+                        <PhotoInfoBody photo={photo}>{infoError}</PhotoInfoBody>
+                      </Drawer.Content>
+                      <footer
+                        ref={sheetFooter}
+                        className="detail-info-footer"
+                        style={{ '--sheet-start': `${-layout.sheet.full - 2}px` } as CSSProperties}
+                      >
+                        {actions}
+                      </footer>
+                    </div>
+                    {expanded && (
+                      <div
+                        ref={sheetViewerClose}
+                        className="detail-sheet-viewer-close"
+                        style={
+                          {
+                            top: `calc(max(8px, env(safe-area-inset-top)) - ${viewport.height - layout.sheet.full}px)`,
+                            '--sheet-start': `${-layout.sheet.full - 2}px`,
+                          } as CSSProperties
+                        }
+                      >
+                        <GlassSurface>
+                          <IconButton
+                            icon="close"
+                            label="关闭照片详情"
+                            onClick={() => {
+                              setInfo('collapsed')
+                              setOpen(false)
+                            }}
+                          />
+                        </GlassSurface>
+                      </div>
+                    )}
+                  </Drawer.Popup>
+                </Drawer.Viewport>
+              </Drawer.Portal>
+            </Drawer.Root>
+          )}
+          {!locked && (
+            <GlassSurface className="detail-corner">
+              {!mobile && (
+                <IconButton
+                  ref={infoButton}
+                  icon="info"
+                  label={expanded ? '收起照片信息' : '显示照片信息'}
+                  aria-expanded={expanded}
+                  aria-controls="photo-information"
+                  onClick={toggleInfo}
+                />
+              )}
+              <Dialog.Close
+                render={<IconButton ref={closeButton} icon="close" label="关闭照片详情" />}
+              />
+            </GlassSurface>
+          )}
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>

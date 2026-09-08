@@ -14,7 +14,8 @@
 | 反代     | Vite /api、/media                        | 现有 Caddy / Cloudflare DNS 与 TLS |
 
 当前 Termux 不依赖不可用的 Sharp Android 原生包来声称后端通过：类型检查与 Web 构建可本地跑；
-原片解码、集成与 Chromium 测试在 ten 的独立工作目录执行。全栈本地环境推荐 Linux / macOS。
+原片解码与 API 集成测试在 ten 的独立工作目录执行；浏览器检查只使用开发机上的浏览器，
+禁止在 ten 启动 SwiftShader 或并行浏览器。全栈本地环境推荐 Linux / macOS。
 也可将本地 8787 隧道到 ten 上独立的开发 API，再运行本地 Vite；不要把开发请求指向公开生产库。
 
 ## 初始化与数据
@@ -57,12 +58,13 @@ pnpm build
 
 ```bash
 FANPHOTO_ENV_FILE=/home/ubuntu/fanphoto-next/.env pnpm exec tsx tools/audit-photos.ts
-FANPHOTO_CAPTURE_ORIGIN=http://127.0.0.1:8788 \
-FANPHOTO_CREDENTIALS_FILE=/home/ubuntu/fanphoto-next/admin-credentials.txt \
-node tools/capture-ui.mjs
+FANPHOTO_CDP_ENDPOINT=http://127.0.0.1:9333 \
+FANPHOTO_UI_ORIGIN=http://127.0.0.1:4173 pnpm test:ui
 ```
 
-密码只在服务器进程内部读取用于登录，不写入截图、报告或控制台。
+该必要浏览器检查仅连接已经启动的开发机浏览器，不自动启动服务器浏览器，不进行管理写操作。
+公开测试图片可通过 `FANPHOTO_READONLY_ORIGIN=https://test.heabl.xyz` 启动 Vite preview；
+此模式禁止代理写方法并剥离登录凭据。截图与报告在 `artifacts/viewer/`。
 
 ## ten 清理与发布
 

@@ -54,6 +54,28 @@ export interface AssetRow {
   bytes: number
   checksum: string
 }
+type AssetInfo = Pick<AssetRow, 'variant' | 'width' | 'height' | 'bytes' | 'checksum'>
+type SummaryRow = Pick<
+  PhotoRow,
+  | 'id'
+  | 'title'
+  | 'width'
+  | 'height'
+  | 'captured_at'
+  | 'captured_local'
+  | 'captured_offset'
+  | 'location'
+  | 'favorite'
+  | 'thumb_hash'
+  | 'created_at'
+  | 'tags_json'
+  | 'assets_json'
+>
+const summarySelect = `p.id,p.title,p.width,p.height,p.captured_at,p.captured_local,p.captured_offset,
+  p.location,p.favorite,p.thumb_hash,p.created_at,
+  (SELECT json_group_array(tag) FROM photo_tags WHERE photo_id=p.id) tags_json,
+  (SELECT json_group_array(json_object('variant',variant,'width',width,'height',height,'bytes',bytes,'checksum',checksum))
+   FROM assets WHERE photo_id=p.id AND variant!='source') assets_json`
 export const photoSelect = `p.*,
   (SELECT json_group_array(tag) FROM photo_tags WHERE photo_id=p.id) tags_json,
   (SELECT json_group_array(album_id) FROM album_photos WHERE photo_id=p.id) albums_json,
@@ -75,11 +97,22 @@ export class PhotoRepository {
     if (!row) return notFound()
     return row
   }
-  summary(row: PhotoRow, admin = false): PhotoSummary {
-    const assets = JSON.parse(row.assets_json) as Pick<
-      AssetRow,
-      'variant' | 'width' | 'height' | 'bytes' | 'checksum'
-    >[]
+  /** Media requests do not need EXIF, analysis or JSON relationship subqueries.
+   * Visibility is still checked in this query, before any conditional 304. */
+  asset(id: string, variant: string, admin = false) {
+    const asset = this.db.get<AssetRow & { title: string; source_name: string }>(
+      `SELECT a.*,p.title,p.source_name FROM assets a JOIN photos p ON p.id=a.photo_id
+       WHERE p.id=? AND a.variant=? ${admin ? '' : 'AND p.is_public=1 AND p.deleted_at IS NULL'}`,
+      [id, variant],
+    )
+    if (!asset) return notFound()
+    return asset
+  }
+  private serializeSummary(
+    row: SummaryRow,
+    showLocation: boolean,
+    assets: AssetInfo[] = JSON.parse(row.assets_json),
+  ): PhotoSummary {
     return {
       id: row.id,
       title: row.title,
@@ -88,7 +121,7 @@ export class PhotoRepository {
       capturedAt: row.captured_offset ? iso(row.captured_at) : null,
       capturedLocal: row.captured_local,
       capturedOffset: row.captured_offset,
-      location: admin || this.settings().showLocation ? row.location : '',
+      location: showLocation ? row.location : '',
       tags: JSON.parse(row.tags_json),
       favorite: !!row.favorite,
       thumbHash: row.thumb_hash,
@@ -109,10 +142,17 @@ export class PhotoRepository {
       ) as PhotoSummary['assets'],
     }
   }
-  full(row: PhotoRow, admin = false): Photo {
-    const show = admin || this.settings().showLocation
+  summary(
+    row: SummaryRow,
+    admin = false,
+    showLocation = admin || this.settings().showLocation,
+  ): PhotoSummary {
+    return this.serializeSummary(row, showLocation)
+  }
+  full(row: PhotoRow, admin = false, show = admin || this.settings().showLocation): Photo {
+    const assets = JSON.parse(row.assets_json) as AssetInfo[]
     return {
-      ...this.summary(row, admin),
+      ...this.serializeSummary(row, show, assets),
       description: row.description,
       latitude: show ? row.latitude : null,
       longitude: show ? row.longitude : null,
@@ -130,9 +170,7 @@ export class PhotoRepository {
         bytes: row.source_bytes,
         width: row.source_width,
         height: row.source_height,
-        originalAvailable:
-          admin &&
-          !!this.db.get("SELECT 1 FROM assets WHERE photo_id=? AND variant='source'", [row.id]),
+        originalAvailable: admin && assets.some((asset) => asset.variant === 'source'),
       },
     }
   }
@@ -200,15 +238,20 @@ export class PhotoRepository {
         throw new ApiError(400, 'INVALID_CURSOR', '分页位置与筛选不匹配，请重新加载')
       }
     }
-    const rows = this.db.all<PhotoRow>(
-      `SELECT ${photoSelect} FROM photos p WHERE ${where.join(' AND ')}
+    const rows = this.db.all<SummaryRow | PhotoRow>(
+      `SELECT ${admin ? photoSelect : summarySelect} FROM photos p WHERE ${where.join(' AND ')}
       ORDER BY ${time} ${asc ? 'ASC' : 'DESC'},p.id ${asc ? 'ASC' : 'DESC'} LIMIT ?`,
       [...values, options.limit + 1],
     )
     const items = rows.slice(0, options.limit)
     const last = items.at(-1)
+    const showLocation = admin || this.settings().showLocation
     return {
-      items: items.map((row) => (admin ? this.full(row, true) : this.summary(row))),
+      items: items.map((row) =>
+        admin && 'description' in row
+          ? this.full(row, true, showLocation)
+          : this.summary(row, admin, showLocation),
+      ),
       page: {
         total,
         limit: options.limit,
@@ -279,22 +322,39 @@ export class PhotoRepository {
   }
   albums(admin = false): Album[] {
     const condition = `p.deleted_at IS NULL${admin ? '' : ' AND p.is_public=1'}`
-    return this.db
-      .all<{ id: string; title: string; description: string }>(
-        'SELECT * FROM albums ORDER BY created_at DESC,id',
+    const albums = this.db.all<{
+      id: string
+      title: string
+      description: string
+      count: number
+      cover_id: string | null
+    }>(
+      `WITH ranked AS (
+        SELECT ap.album_id,p.id,COUNT(*) OVER(PARTITION BY ap.album_id) count,
+          ROW_NUMBER() OVER(PARTITION BY ap.album_id ORDER BY p.favorite DESC,ap.position,p.created_at DESC,p.id DESC) rank
+        FROM album_photos ap JOIN photos p ON p.id=ap.photo_id WHERE ${condition}
       )
-      .map((album) => {
-        const count = this.db.get<{ n: number }>(
-          `SELECT count(*) n FROM photos p JOIN album_photos ap ON ap.photo_id=p.id WHERE ap.album_id=? AND ${condition}`,
-          [album.id],
-        )!.n
-        const cover = this.db.get<PhotoRow>(
-          `SELECT ${photoSelect} FROM photos p JOIN album_photos ap ON ap.photo_id=p.id WHERE ap.album_id=? AND ${condition}
-          ORDER BY p.favorite DESC,ap.position,p.created_at DESC LIMIT 1`,
-          [album.id],
-        )
-        return { ...album, count, cover: cover ? this.summary(cover, admin) : null }
-      })
-      .filter((album) => admin || album.count > 0)
+      SELECT a.id,a.title,a.description,COALESCE(r.count,0) count,r.id cover_id
+      FROM albums a LEFT JOIN ranked r ON r.album_id=a.id AND r.rank=1
+      ${admin ? '' : 'WHERE r.count>0'} ORDER BY a.created_at DESC,a.id`,
+    )
+    const ids = [...new Set(albums.flatMap((album) => (album.cover_id ? [album.cover_id] : [])))]
+    const covers = new Map(
+      (ids.length
+        ? this.db.all<SummaryRow>(
+            `SELECT ${summarySelect} FROM photos p WHERE p.id IN (${ids.map(() => '?')}) AND ${condition}`,
+            ids,
+          )
+        : []
+      ).map((row) => [row.id, row]),
+    )
+    const showLocation = admin || this.settings().showLocation
+    return albums.map(({ cover_id, ...album }) => ({
+      ...album,
+      cover:
+        cover_id && covers.has(cover_id)
+          ? this.summary(covers.get(cover_id)!, admin, showLocation)
+          : null,
+    }))
   }
 }

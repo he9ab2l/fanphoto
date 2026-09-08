@@ -1,13 +1,14 @@
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
+import { compress } from 'hono/compress'
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { extname, resolve, sep } from 'node:path'
 import { idSchema, MAX_UPLOAD_BYTES, variants } from '@fanphoto/contracts'
 import { ApiError, notFound } from './core/errors'
+import { acceptedEncodings, matchesEtag } from './core/http-cache'
 import type { HttpEnv } from './modules/auth'
-import type { AssetRow } from './modules/gallery/repository'
 import type { Services } from './services'
 
 const jsonBody = async (request: { json: () => Promise<unknown> }) => {
@@ -35,6 +36,8 @@ export function createApp(services: Services) {
       "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
     )
     if (c.req.path.startsWith('/api/')) c.header('Cache-Control', 'no-store')
+    else if (c.req.path.startsWith('/media/') && c.res.status >= 400)
+      c.header('Cache-Control', 'private, no-store')
   })
   app.use('/api/*', async (c, next) =>
     bodyLimit({
@@ -45,6 +48,7 @@ export function createApp(services: Services) {
   )
 
   const api = new Hono<HttpEnv>()
+  api.use('*', compress({ threshold: 1024, contentTypeFilter: /^application\/json/ }))
   api.get('/health', (c) => {
     db.get('SELECT 1')
     return c.json({ ok: true, version: '2.0.0', apiVersion: 1, storage: 'sqlite-files' })
@@ -161,19 +165,16 @@ export function createApp(services: Services) {
     })
   })
   api.get('/admin/photos/:id/source', async (c) => {
-    const row = photos.row(idSchema.parse(c.req.param('id')), true)
-    const asset = db.get<AssetRow>("SELECT * FROM assets WHERE photo_id=? AND variant='source'", [
-      row.id,
-    ])
-    if (!asset) return notFound()
+    const asset = photos.asset(idSchema.parse(c.req.param('id')), 'source', true)
     const object = await store.get(asset.storage_key)
     if (!object) return notFound()
-    return new Response(object.body, {
+    if (c.req.method === 'HEAD') await object.body.cancel()
+    return new Response(c.req.method === 'HEAD' ? null : object.body, {
       headers: {
         'Content-Type': asset.mime,
         'Content-Length': String(object.size),
         'Cache-Control': 'private, no-store',
-        'Content-Disposition': `attachment; filename="${row.id}"; filename*=UTF-8''${encodeURIComponent(row.source_name)}`,
+        'Content-Disposition': `attachment; filename="${asset.photo_id}"; filename*=UTF-8''${encodeURIComponent(asset.source_name)}`,
       },
     })
   })
@@ -181,41 +182,35 @@ export function createApp(services: Services) {
     const admin = !!auth.current(c)
     if (!admin && !settings.get().allowDownloads)
       throw new ApiError(403, 'DOWNLOAD_DISABLED', '作者未开放下载')
-    const row = photos.row(idSchema.parse(c.req.param('id')), admin)
-    const asset = db.get<AssetRow>("SELECT * FROM assets WHERE photo_id=? AND variant='original'", [
-      row.id,
-    ])!
+    const asset = photos.asset(idSchema.parse(c.req.param('id')), 'original', admin)
     const object = await store.get(asset.storage_key)
     if (!object) return notFound()
-    return new Response(object.body, {
+    if (c.req.method === 'HEAD') await object.body.cancel()
+    return new Response(c.req.method === 'HEAD' ? null : object.body, {
       headers: {
         'Content-Type': asset.mime,
         'Content-Length': String(object.size),
         'Cache-Control': 'private, no-store',
-        'Content-Disposition': `attachment; filename="${row.id}.webp"; filename*=UTF-8''${encodeURIComponent(row.title + '.webp')}`,
+        'Content-Disposition': `attachment; filename="${asset.photo_id}.webp"; filename*=UTF-8''${encodeURIComponent(asset.title + '.webp')}`,
       },
     })
   })
   app.route('/api/v1', api)
   app.get('/media/photos/:id/:variant', async (c) => {
     const admin = !!auth.current(c)
-    const row = photos.row(idSchema.parse(c.req.param('id')), admin)
+    const id = idSchema.parse(c.req.param('id'))
     const variant = c.req.param('variant')
     if (!(variants as readonly string[]).includes(variant)) return notFound()
+    const asset = photos.asset(id, variant, admin)
     if (variant === 'original' && !admin && !settings.get().allowDownloads)
       throw new ApiError(403, 'DOWNLOAD_DISABLED', '作者未开放完整尺寸下载')
-    const asset = db.get<AssetRow>('SELECT * FROM assets WHERE photo_id=? AND variant=?', [
-      row.id,
-      variant,
-    ])
-    if (!asset) return notFound()
     const headers = {
       'Content-Type': asset.mime,
       'Cache-Control': 'private, no-cache',
       ETag: `"${asset.checksum}"`,
       'X-Content-Type-Options': 'nosniff',
     }
-    if (c.req.header('if-none-match') === headers.ETag)
+    if (matchesEtag(c.req.header('if-none-match'), headers.ETag))
       return new Response(null, { status: 304, headers })
     const object = await store.get(asset.storage_key)
     if (!object) return notFound()
@@ -254,14 +249,35 @@ export function createApp(services: Services) {
       path = resolve(assetRoot, 'index.html')
     }
     try {
-      const contents = await readFile(path)
-      return new Response(c.req.method === 'HEAD' ? null : contents, {
-        headers: {
-          'Content-Type': mime[extname(path)] || 'application/octet-stream',
-          'Cache-Control': c.req.path.startsWith('/assets/')
-            ? 'public, max-age=31536000, immutable'
-            : 'no-cache',
-        },
+      const contentType = mime[extname(path)] || 'application/octet-stream'
+      let representation = path
+      let encoding: 'br' | 'gzip' | undefined
+      if (/\.(?:html|js|css|svg|json|txt)$/.test(path)) {
+        for (const candidate of acceptedEncodings(c.req.header('accept-encoding'))) {
+          const compressed = `${path}.${candidate === 'gzip' ? 'gz' : 'br'}`
+          if ((await stat(compressed).catch(() => null))?.isFile()) {
+            representation = compressed
+            encoding = candidate
+            break
+          }
+        }
+      }
+      const entry = await stat(representation)
+      const etag = `W/"${entry.size.toString(16)}-${entry.mtimeMs.toString(16)}-${encoding || 'identity'}"`
+      const headers = {
+        'Content-Type': contentType,
+        'Cache-Control': c.req.path.startsWith('/assets/')
+          ? 'public, max-age=31536000, immutable'
+          : 'no-cache',
+        Vary: 'Accept-Encoding',
+        ETag: etag,
+        ...(encoding ? { 'Content-Encoding': encoding } : {}),
+      }
+      if (matchesEtag(c.req.header('if-none-match'), etag))
+        return new Response(null, { status: 304, headers })
+      const contents = c.req.method === 'HEAD' ? null : await readFile(representation)
+      return new Response(contents, {
+        headers: { ...headers, 'Content-Length': String(entry.size) },
       })
     } catch {
       throw new ApiError(503, 'CLIENT_NOT_BUILT', '请先构建客户端')

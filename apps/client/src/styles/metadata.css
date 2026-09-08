@@ -1,0 +1,94 @@
+.metadata {
+  display: grid;
+  gap: 24px;
+  padding: 2px 0 10px;
+}
+.metadata section + section {
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.metadata h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+.metadata h3 svg {
+  flex: none;
+  color: var(--muted);
+}
+.metadata-facts {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+.metadata-facts > div {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.metadata-facts dt {
+  color: var(--muted);
+}
+.metadata-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.photo-description {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.metadata .muted {
+  font-size: 12px;
+}
+.metadata .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.metadata .tag {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.attribution {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.attribution h3 {
+  margin-bottom: 4px;
+}
+.attribution p {
+  overflow-wrap: anywhere;
+}
+.attribution a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .metadata-facts > div {
+    grid-template-columns: 76px minmax(0, 1fr);
+    font-size: 13px;
+  }
+}

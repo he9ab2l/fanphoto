@@ -1,12 +1,11 @@
 /**
  * Application layout adapters for React Bits Masonry / DomeGallery.
- * Flat wall = adaptive justified rows (V2.1: score-based row building, hard/soft
- * width bands, special rows for extreme ratios, next-row preview, last-row slack).
- * Cylinder/sphere = tangent planes on the inside of a virtual surface.
+ * Flat wall = globally balanced, aspect-preserving justified rows.
+ * Surround = tangent planes on the inside of a horizontally curved surface.
  * These pure functions also serve the geometry tests.
  */
 import type { PhotoSummary } from '@fanphoto/contracts'
-export type WallMode = 'flat' | 'cylinder' | 'sphere'
+export type WallMode = 'flat' | 'surround'
 export interface Pose {
   x: number
   y: number
@@ -28,136 +27,114 @@ export function columnCount(width: number, density: number) {
   if (width < 600) return density === 3 ? 3 : 2
   return Math.max(2, Math.min(9, Math.floor(width / ({ 1: 340, 2: 260, 3: 200 }[density] || 260))))
 }
+const SURROUND_OPTIONS = {
+  areaFactor: 0.78,
+  gap: 14,
+  denseGap: 8,
+  overscanColumns: 2,
+  overscanHeight: 0.65,
+}
 
 // ---------------------------------------------------------------------------
-// Justified wall (V2.1)
+// Balanced justified wall
 // ---------------------------------------------------------------------------
 // 所有参数集中在 DEFAULT_JUSTIFY_OPTIONS（按密度档），调用方可用
-// Partial<JustifyOptions> 覆盖任意字段，方便调试，不散落硬编码。
+// JustifyOverrides 覆盖任意字段（含嵌套字段），方便调试。
 
 export interface JustifyBand {
   min: number
   max: number
 }
 export interface JustifyWeights {
-  /** 第 2 优先：rowHeight 接近 target */
+  area: number
   rowHeight: number
-  /** 第 3 优先：避免单图过小 / 过大（soft 带外罚分） */
-  tileSize: number
-  /** 第 4 优先：与上一行高度平滑 */
   flow: number
-  /** 第 5 优先：next-row preview 罚分 */
-  preview: number
+  shortSide: number
+  tileSize: number
+  dispersion: number
+  nonRectangular: number
 }
 export interface JustifyOptions {
-  /** 目标行高（像素） */
   targetRowHeight: number
-  /** 行内与行间间距（像素） */
+  mobileRowFactor: number
+  targetAspect: number
+  minimumWidthFraction: number
   gap: number
-  /** soft 单图宽带：带外轻微超限只罚分 */
   soft: JustifyBand
-  /** hard 单图宽带（严格档）：带外候选直接 invalid */
-  strict: JustifyBand
-  /** hard 单图宽带（放宽档）：仅当 strict 档无候选时启用 */
-  relaxed: JustifyBand
-  /** 行内 maxW/minW 硬上限：超过该极差的候选行直接淘汰（防全景把窄图压到极小） */
   tileDispersion: number
-  /** 行内 maxW/minW 软阈值：超过则层 3 罚分 */
   tileDispersionSoft: number
-  /** ratio >= 此值视为超宽 extreme */
-  extremeWide: number
-  /** ratio <= 此值视为超高 extreme */
-  extremeTall: number
-  /** special row 单图高度上限（超高长图用之，防无限高） */
+  isolatedPortraitMin: number
+  isolatedPortraitMax: number
+  isolatedAreaFactor: number
   specialMaxHeight: number
-  /** 每行贪心候选张数上限；剩余照片数不超过它时进入尾部整体规划 */
   maxRowPhotos: number
-  /** 中间行行高硬帽（相对 targetRowHeight 的倍数），防偶发巨行 */
-  maxRowHeightFactor: number
-  /** 尾部整体规划最多拆几行 */
-  tailMaxRows: number
-  /** 尾部铺满行高上限（相对 targetRowHeight 的倍数），防单张爆屏 */
-  tailRowHeightCap: number
-  /** next-row preview 最多模拟的张数 */
-  previewNext: number
-  /** 下一行行高相对 target 的合理区间，超出即极端 */
-  previewRange: [number, number]
-  /** 评分权重（层级 2..5，第 1 层硬约束为淘汰制不参与加权） */
+  reflowRows: number
+  /** Safety ceiling for a full-width row made from only very tall photos. */
+  rowHeightCap: number
   weights: JustifyWeights
+}
+export type JustifyOverrides = Omit<Partial<JustifyOptions>, 'soft' | 'weights'> & {
+  soft?: Partial<JustifyBand>
+  weights?: Partial<JustifyWeights>
+}
+const sharedOptions = {
+  targetAspect: 1.45,
+  minimumWidthFraction: 0.22,
+  tileDispersion: 6,
+  tileDispersionSoft: 3.5,
+  isolatedPortraitMin: 0.45,
+  isolatedPortraitMax: 0.85,
+  isolatedAreaFactor: 3,
+  maxRowPhotos: 10,
+  reflowRows: 2,
+  rowHeightCap: 20,
+  weights: {
+    area: 2,
+    rowHeight: 0.3,
+    flow: 0.65,
+    shortSide: 3,
+    tileSize: 0.3,
+    dispersion: 0.2,
+    nonRectangular: 10000,
+  },
 }
 export const DEFAULT_JUSTIFY_OPTIONS: Record<number, JustifyOptions> = {
   1: {
+    ...sharedOptions,
     targetRowHeight: 250,
+    mobileRowFactor: 0.5,
     gap: 10,
     soft: { min: 140, max: 600 },
-    strict: { min: 95, max: 1000 },
-    relaxed: { min: 38, max: 1500 },
-    tileDispersion: 5,
-    tileDispersionSoft: 3.5,
-    extremeWide: 3.2,
-    extremeTall: 0.45,
     specialMaxHeight: 2000,
-    maxRowPhotos: 10,
-    maxRowHeightFactor: 6,
-    tailMaxRows: 4,
-    tailRowHeightCap: 20,
-    previewNext: 3,
-    previewRange: [0.55, 1.8],
-    weights: { rowHeight: 1, tileSize: 0.5, flow: 0.3, preview: 0.2 },
   },
   2: {
+    ...sharedOptions,
     targetRowHeight: 195,
+    mobileRowFactor: 0.4,
     gap: 10,
     soft: { min: 110, max: 468 },
-    strict: { min: 74, max: 780 },
-    relaxed: { min: 29, max: 1170 },
-    tileDispersion: 5,
-    tileDispersionSoft: 3.5,
-    extremeWide: 3.2,
-    extremeTall: 0.45,
     specialMaxHeight: 1560,
-    maxRowPhotos: 10,
-    maxRowHeightFactor: 6,
-    tailMaxRows: 4,
-    tailRowHeightCap: 20,
-    previewNext: 3,
-    previewRange: [0.55, 1.8],
-    weights: { rowHeight: 1, tileSize: 0.5, flow: 0.3, preview: 0.2 },
   },
   3: {
+    ...sharedOptions,
     targetRowHeight: 150,
+    mobileRowFactor: 0.3,
     gap: 6,
     soft: { min: 84, max: 360 },
-    strict: { min: 57, max: 600 },
-    relaxed: { min: 23, max: 900 },
-    tileDispersion: 5,
-    tileDispersionSoft: 3.5,
-    extremeWide: 3.2,
-    extremeTall: 0.45,
     specialMaxHeight: 1200,
-    maxRowPhotos: 10,
-    maxRowHeightFactor: 6,
-    tailMaxRows: 4,
-    tailRowHeightCap: 20,
-    previewNext: 3,
-    previewRange: [0.55, 1.8],
-    weights: { rowHeight: 1, tileSize: 0.5, flow: 0.3, preview: 0.2 },
   },
 }
-export function mergeJustifyOptions(
-  density: number,
-  options?: Partial<JustifyOptions>,
-): JustifyOptions {
+export function mergeJustifyOptions(density: number, options?: JustifyOverrides): JustifyOptions {
   const base = DEFAULT_JUSTIFY_OPTIONS[density] ?? DEFAULT_JUSTIFY_OPTIONS[2]
-  const merged: JustifyOptions = { ...base, ...options }
-  if (options?.soft) merged.soft = { ...base.soft, ...options.soft }
-  if (options?.strict) merged.strict = { ...base.strict, ...options.strict }
-  if (options?.relaxed) merged.relaxed = { ...base.relaxed, ...options.relaxed }
-  if (options?.weights) merged.weights = { ...base.weights, ...options.weights }
-  return merged
+  return {
+    ...base,
+    ...options,
+    soft: { ...base.soft, ...options?.soft },
+    weights: { ...base.weights, ...options?.weights },
+  }
 }
 
-/** 行构建计划：buildRow 产出行成员与行高，emitRow 负责排版输出。 */
+/** A chosen row; geometry is emitted once after the sequence is planned. */
 interface RowPlan {
   count: number
   rowHeight: number
@@ -168,321 +145,6 @@ interface RowPlan {
 }
 
 const photoRatio = (photo: PhotoSummary) => photo.width / photo.height
-const isExtreme = (ratio: number, opts: JustifyOptions) =>
-  ratio >= opts.extremeWide || ratio <= opts.extremeTall
-
-/** 铺满行高：容器宽度按归一化宽度摊给候选行成员。 */
-function fillRowHeight(
-  photos: PhotoSummary[],
-  start: number,
-  count: number,
-  width: number,
-  gap: number,
-) {
-  let total = 0
-  for (let j = 0; j < count; j++) total += photoRatio(photos[start + j])
-  return (width - (count - 1) * gap) / total
-}
-/**
- * 最后一行 A 策略：默认按 targetRowHeight 排（允许尾部留白，不放大铺满）。
- * 硬约束只降不升：单图不超过 strict.max、行不超出容器；
- * 软可读抬升（minR 图不至于过细）以上述硬帽为限，冲突时让步硬约束。
- */
-function lastRowHeight(
-  photos: PhotoSummary[],
-  start: number,
-  count: number,
-  width: number,
-  opts: JustifyOptions,
-) {
-  let maxR = 0
-  let minR = Infinity
-  let total = 0
-  for (let j = 0; j < count; j++) {
-    const r = photoRatio(photos[start + j])
-    if (r > maxR) maxR = r
-    if (r < minR) minR = r
-    total += r
-  }
-  // 硬帽：单图宽度 ≤ strict.max、行总宽 ≤ 容器宽
-  const cap = Math.min(opts.strict.max / maxR, (width - (count - 1) * opts.gap) / total)
-  let h = Math.min(opts.targetRowHeight, cap)
-  if (minR * h < opts.soft.min) h = Math.min(Math.max(h, opts.soft.min / minR), cap)
-  return h
-}
-
-/** 候选行内每张 tile 宽度是否全部落在 band 内。 */
-function tileWidthsInBand(
-  photos: PhotoSummary[],
-  start: number,
-  count: number,
-  rowHeight: number,
-  band: JustifyBand,
-) {
-  for (let j = 0; j < count; j++) {
-    const w = photoRatio(photos[start + j]) * rowHeight
-    if (w < band.min || w > band.max) return false
-  }
-  return true
-}
-/** 候选行内每张 tile 的宽度列表。 */
-function tileWidths(photos: PhotoSummary[], start: number, count: number, rowHeight: number) {
-  const ws: number[] = []
-  for (let j = 0; j < count; j++) ws.push(photoRatio(photos[start + j]) * rowHeight)
-  return ws
-}
-/** 行内 maxW / minW。 */
-const maxDivMin = (ws: number[]) => {
-  let minW = Infinity
-  let maxW = 0
-  for (const w of ws) {
-    if (w < minW) minW = w
-    if (w > maxW) maxW = w
-  }
-  return maxW / minW
-}
-
-/** 轻量 next-row preview：对下一行模拟最多 previewNext 张，全部极端才罚分。 */
-function nextRowPreviewScore(
-  photos: PhotoSummary[],
-  next: number,
-  count: number,
-  width: number,
-  opts: JustifyOptions,
-) {
-  const start = next + count
-  if (start >= photos.length) return 1
-  const n = Math.min(opts.previewNext, photos.length - start)
-  const [lo, hi] = opts.previewRange
-  let leastDeviation = Infinity
-  for (let k = 1; k <= n; k++) {
-    let total = 0
-    for (let j = 0; j < k; j++) total += photoRatio(photos[start + j])
-    const rel = (width - (k - 1) * opts.gap) / total / opts.targetRowHeight
-    if (rel >= lo && rel <= hi) return 1 // 至少存在一种不极端的下一行 → 不罚
-    leastDeviation = Math.min(leastDeviation, rel < lo ? (lo - rel) / lo : (rel - hi) / hi)
-  }
-  return Math.max(0, 1 - leastDeviation)
-}
-
-/** 分层评分（层级 2..5；层级 1 硬约束已在候选筛选中淘汰），归一化到 [0,1]。 */
-function scoreCandidate(
-  photos: PhotoSummary[],
-  start: number,
-  plan: RowPlan,
-  width: number,
-  opts: JustifyOptions,
-  previousRowHeight: number,
-) {
-  let minW = Infinity
-  let maxW = 0
-  for (let j = 0; j < plan.count; j++) {
-    const w = photoRatio(photos[start + j]) * plan.rowHeight
-    if (w < minW) minW = w
-    if (w > maxW) maxW = w
-  }
-  // 层级 2：行高接近 target
-  const sRowHeight =
-    1 - Math.min(Math.abs(plan.rowHeight - opts.targetRowHeight) / opts.targetRowHeight, 1)
-  // 层级 3：soft 带外轻微超限（过小/过大）+ 行内极差超软阈值的线性罚分（带内为 0）
-  const under = opts.soft.min - minW
-  const over = maxW - opts.soft.max
-  const dispersion =
-    maxW / minW > opts.tileDispersionSoft
-      ? (maxW / minW - opts.tileDispersionSoft) / (opts.tileDispersion - opts.tileDispersionSoft)
-      : 0
-  const violation = Math.max(
-    under > 0 ? under / (opts.soft.min - opts.strict.min) : 0,
-    over > 0 ? over / (opts.strict.max - opts.soft.max) : 0,
-    dispersion,
-  )
-  const sTileSize = 1 - Math.min(violation, 1)
-  // 层级 4：与上一行高度平滑
-  const denom = Math.max(plan.rowHeight, previousRowHeight, 1)
-  const sFlow = 1 - Math.min(Math.abs(plan.rowHeight - previousRowHeight) / denom, 1)
-  // 层级 5：next-row preview
-  const sPreview = nextRowPreviewScore(photos, start, plan.count, width, opts)
-  const { rowHeight: w2, tileSize: w3, flow: w4, preview: w5 } = opts.weights
-  return (w2 * sRowHeight + w3 * sTileSize + w4 * sFlow + w5 * sPreview) / (w2 + w3 + w4 + w5)
-}
-
-/**
- * extreme 照片的 special row：不强制铺满容器。
- * 超宽全景 → 宽度受限（≤ strict.max），自然高度，靠左；
- * 超高长图 → 高度受限（≤ specialMaxHeight），宽度 = 高度×比例，居中。
- */
-function specialRow(photo: PhotoSummary, width: number, opts: JustifyOptions): RowPlan {
-  const ratio = photoRatio(photo)
-  if (ratio >= opts.extremeWide)
-    return {
-      count: 1,
-      rowHeight: Math.min(width, opts.strict.max) / ratio,
-      fill: false,
-      align: 'left',
-    }
-  return { count: 1, rowHeight: opts.specialMaxHeight, fill: false, align: 'center' }
-}
-
-/**
- * 尾部整体规划（矩形化）：剩余照片（≤ maxRowPhotos）一次拆成 1..tailMaxRows 个铺满行，
- * 枚举所有连续划分，选行高最贴近 target 且相邻平滑的合法方案。
- * 任何划分都被硬帽（cap）或 hard band 挡下时返回 null，由调用方回退到逐行 buildRow。
- */
-function planTail(
-  photos: PhotoSummary[],
-  start: number,
-  width: number,
-  opts: JustifyOptions,
-  previousRowHeight: number,
-): RowPlan[] | null {
-  const left = photos.length - start
-  if (left <= 0) return []
-  const cap = opts.targetRowHeight * opts.tailRowHeightCap
-  const maxRows = Math.min(opts.tailMaxRows, left)
-  let best: RowPlan[] | null = null
-  let bestScore = Infinity
-  const tryPartition = (sizes: number[]) => {
-    let pos = start
-    const rows: RowPlan[] = []
-    let ok = true
-    for (const size of sizes) {
-      const h = fillRowHeight(photos, pos, size, width, opts.gap)
-      // 尾部为收官段：只防"单图过细（< soft.min）"、"行内极差过大"与"行高爆掉（> cap）"，
-      // max 不做硬挡 —— 行总宽恒等于容器宽，尽力铺满不留空缺
-      let minW = Infinity
-      let maxW = 0
-      for (let j = 0; j < size; j++) {
-        const w = photoRatio(photos[pos + j]) * h
-        if (w < minW) minW = w
-        if (w > maxW) maxW = w
-      }
-      if (h > cap || minW < opts.soft.min || maxW / minW > opts.tileDispersion) {
-        ok = false
-        break
-      }
-      rows.push({ count: size, rowHeight: h, fill: true, align: 'left' })
-      pos += size
-    }
-    if (!ok) return
-    let score = 0
-    for (const row of rows)
-      score += Math.abs(row.rowHeight - opts.targetRowHeight) / opts.targetRowHeight
-    score /= rows.length
-    for (let i = 1; i < rows.length; i++)
-      score +=
-        0.35 *
-        (Math.abs(rows[i].rowHeight - rows[i - 1].rowHeight) /
-          Math.max(rows[i].rowHeight, rows[i - 1].rowHeight))
-    if (previousRowHeight > 0)
-      score +=
-        0.35 *
-        (Math.abs(rows[0].rowHeight - previousRowHeight) /
-          Math.max(rows[0].rowHeight, previousRowHeight))
-    if (score < bestScore) {
-      bestScore = score
-      best = rows
-    }
-  }
-  // 枚举连续划分：sizes 各段 ≥1，总和 = left，段数 ≤ maxRows
-  const gen = (from: number, rowsLeft: number, sizes: number[]) => {
-    const remain = left - from
-    if (rowsLeft === 1) {
-      tryPartition([...sizes, remain])
-      return
-    }
-    for (let s = 1; s <= remain - (rowsLeft - 1); s++) gen(from + s, rowsLeft - 1, [...sizes, s])
-  }
-  for (let r = 1; r <= maxRows; r++) gen(0, r, [])
-  return best
-}
-
-/** 贪心构建一行（借鉴 Justified-Gallery 的行填充语义）：
- * 先按"加到下一张行高会跌破 target"的规则锚定张数 k*（行内张数钉在 target 行高附近，
- * 避免评分漂移把窄图压小），再在 k*±1 邻域内做 band / 极差 / 行高帽过滤 + 分层评分选优。
- * 邻域无解时退化为全枚举（极端比例库仍找得到 legal 行）；仍无解则 extreme 走 special、
- * 正常照片以单张 A 策略兜底 —— 保证全部照片按原始顺序落位、永不丢图。
- */
-function buildRow(
-  photos: PhotoSummary[],
-  start: number,
-  width: number,
-  opts: JustifyOptions,
-  previousRowHeight: number,
-): RowPlan {
-  const remaining = photos.length - start
-  const maxCount = Math.min(opts.maxRowPhotos, remaining)
-  const maxRowHeight = opts.targetRowHeight * opts.maxRowHeightFactor
-  const cumulativeAr = (n: number) => {
-    let s = 0
-    for (let j = 0; j < n; j++) s += photoRatio(photos[start + j])
-    return s
-  }
-  const fillHeight = (k: number) => (width - (k - 1) * opts.gap) / cumulativeAr(k)
-  // 锚点 k*：行高保持 ≥ target 的最大张数（再加入一张行高跌破 target）
-  let kStar = maxCount
-  for (let k = 1; k <= maxCount; k++)
-    if (fillHeight(k) < opts.targetRowHeight) {
-      kStar = k - 1
-      break
-    }
-  if (kStar < 1) kStar = 1
-  const kernels =
-    kStar === maxCount
-      ? kStar > 1
-        ? [kStar - 1, kStar]
-        : [kStar]
-      : kStar > 1
-        ? [kStar - 1, kStar, kStar + 1]
-        : [kStar, kStar + 1]
-  const legal = (k: number, band: JustifyBand): RowPlan | null => {
-    if (k < 1 || k > maxCount) return null
-    const isLastRow = start + k === photos.length
-    const rowHeight = isLastRow ? lastRowHeight(photos, start, k, width, opts) : fillHeight(k)
-    if (!isLastRow && rowHeight > maxRowHeight) return null
-    const plan: RowPlan = { count: k, rowHeight, fill: !isLastRow, align: 'left' }
-    const ws = tileWidths(photos, start, k, rowHeight)
-    if (ws.some((w) => w < band.min || w > band.max)) return null
-    if (maxDivMin(ws) > opts.tileDispersion) return null
-    return plan
-  }
-  const collect = (ks: number[]) => {
-    const out: RowPlan[] = []
-    for (const band of [opts.strict, opts.relaxed])
-      for (const k of ks) {
-        const plan = legal(k, band)
-        if (plan) out.push(plan)
-      }
-    return out
-  }
-  let candidates = collect(kernels)
-  if (!candidates.length) {
-    // 锚点邻域无解：极端比例库退化到全枚举
-    const allKs: number[] = []
-    for (let k = 1; k <= maxCount; k++) allKs.push(k)
-    candidates = collect(allKs)
-  }
-  if (candidates.length) {
-    let best = candidates[0]
-    let bestScore = -Infinity
-    for (const candidate of candidates) {
-      const score = scoreCandidate(photos, start, candidate, width, opts, previousRowHeight)
-      if (score > bestScore) {
-        bestScore = score
-        best = candidate
-      }
-    }
-    return best
-  }
-  if (isExtreme(photoRatio(photos[start]), opts)) return specialRow(photos[start], width, opts)
-  // 孤立窄图兜底：单张 A 策略行，水平居中（画廊单图观感），避免贴左孤条 + 大片留白
-  return {
-    count: 1,
-    rowHeight: lastRowHeight(photos, start, 1, width, opts),
-    fill: false,
-    align: 'center',
-  }
-}
-
 /** 输出一行 tiles。铺满行的最后一张用 width - x 精确保贴容器右缘，消除浮点累计误差。 */
 function emitRow(
   photos: PhotoSummary[],
@@ -507,58 +169,195 @@ function emitRow(
 }
 
 /**
- * Adaptive justified rows：逐行贪心 + 分层评分，保持照片原始顺序。
- * 返回 { tiles, height } 供 absolute positioning 渲染；签名与旧最短列实现兼容。
+ * Plan the whole loaded sequence instead of committing locally to a row and
+ * enlarging its leftovers later. Log-area error penalizes tiny and huge photos
+ * equally; a transition cost avoids an isolated very tall row between panoramas.
+ * Candidate rows and suffix solutions are reused: O(n * maxRowPhotos²).
+ */
+function balancedRows(photos: PhotoSummary[], width: number, opts: JustifyOptions): RowPlan[] {
+  const target = Math.min(opts.targetRowHeight, width * opts.mobileRowFactor)
+  const targetArea = target * Math.min(width, target * opts.targetAspect)
+  const minimumWidth = Math.min(opts.soft.min, width * opts.minimumWidthFraction)
+  const isolatedPortrait = (index: number, ratio: number, fullHeight: number) => {
+    if (
+      photos.length < 2 ||
+      ratio < opts.isolatedPortraitMin ||
+      ratio >= opts.isolatedPortraitMax ||
+      fullHeight * width <= targetArea * opts.isolatedAreaFactor
+    )
+      return false
+    return [photos[index - 1], photos[index + 1]].filter(Boolean).every((neighbor) => {
+      const other = photoRatio(neighbor)
+      const height = (width - opts.gap) / (ratio + other)
+      return (
+        Math.max(ratio, other) / Math.min(ratio, other) > opts.tileDispersion ||
+        Math.min(ratio, other) * height < minimumWidth
+      )
+    })
+  }
+  type Candidate = { plan: RowPlan; cost: number; total: number; next: number }
+  const candidates: Candidate[][] = Array.from({ length: photos.length }, () => [])
+  for (let start = photos.length - 1; start >= 0; start--) {
+    let sum = 0
+    let minRatio = Infinity
+    let maxRatio = 0
+    for (let count = 1; count <= Math.min(opts.maxRowPhotos, photos.length - start); count++) {
+      const ratio = photoRatio(photos[start + count - 1])
+      sum += ratio
+      minRatio = Math.min(minRatio, ratio)
+      maxRatio = Math.max(maxRatio, ratio)
+      const fullHeight = (width - (count - 1) * opts.gap) / sum
+      if (fullHeight <= 0) break
+      if (count > 1 && fullHeight > opts.targetRowHeight * opts.rowHeightCap) continue
+      if (
+        count > 1 &&
+        (maxRatio / minRatio > opts.tileDispersion || minRatio * fullHeight < minimumWidth)
+      )
+        continue
+      const heightCap =
+        count === 1 && isolatedPortrait(start, ratio, fullHeight)
+          ? Math.min(opts.specialMaxHeight, Math.sqrt(targetArea / ratio))
+          : opts.specialMaxHeight
+      const rowHeight = count === 1 ? Math.min(fullHeight, heightCap) : fullHeight
+      const plan: RowPlan = {
+        count,
+        rowHeight,
+        fill: rowHeight === fullHeight,
+        align: rowHeight === fullHeight ? 'left' : 'center',
+      }
+      // A bounded, centered strip is a last resort, never a cheaper way to
+      // leave a hole when a proportional, full-width partition exists.
+      let cost = plan.fill ? 0 : opts.weights.nonRectangular
+      for (let j = start; j < start + count; j++) {
+        const tileWidth = photoRatio(photos[j]) * rowHeight
+        const areaError = Math.log((tileWidth * rowHeight) / targetArea)
+        const shortSide = Math.min(tileWidth, rowHeight)
+        cost +=
+          opts.weights.area * areaError ** 2 +
+          opts.weights.rowHeight * Math.log(rowHeight / target) ** 2
+        cost += opts.weights.shortSide * Math.max(0, Math.log(minimumWidth / shortSide)) ** 2
+        cost += opts.weights.tileSize * Math.max(0, Math.log(tileWidth / opts.soft.max)) ** 2
+      }
+      cost +=
+        opts.weights.dispersion *
+        Math.max(0, Math.log(maxRatio / minRatio / opts.tileDispersionSoft)) ** 2
+      const end = start + count
+      let total = cost
+      let next = -1
+      if (end < photos.length) {
+        total = Infinity
+        candidates[end].forEach((candidate, index) => {
+          const flow = opts.weights.flow * Math.log(candidate.plan.rowHeight / rowHeight) ** 2
+          const score = cost + candidate.total + flow
+          if (score < total) {
+            total = score
+            next = index
+          }
+        })
+      }
+      candidates[start].push({ plan, cost, total, next })
+    }
+  }
+  const rows: RowPlan[] = []
+  let start = 0
+  let choice = 0
+  candidates[0].forEach((candidate, index) => {
+    if (candidate.total < candidates[0][choice].total) choice = index
+  })
+  while (start < photos.length) {
+    const candidate = candidates[start][choice]
+    rows.push(candidate.plan)
+    start += candidate.plan.count
+    choice = candidate.next
+  }
+  return rows
+}
+
+/**
+ * Balanced justified rows：整段最优化面积/行高/相邻变化，保持原始顺序。
+ * 返回 { tiles, height } 供照片墙定位，不在布局函数中触碰 DOM。
  */
 export function masonry(
   photos: PhotoSummary[],
   width: number,
   density = 2,
-  options?: Partial<JustifyOptions>,
+  options?: JustifyOverrides,
 ) {
   if (width <= 0 || photos.length === 0) return { tiles: [] as Tile[], height: 0 }
   const opts = mergeJustifyOptions(density, options)
   const tiles: Tile[] = []
   let y = 0
-  let previousRowHeight = 0 // 独立维护上一行实际行高，与纵向坐标 y 分离
   let i = 0
-  while (i < photos.length) {
-    // 剩余不足一行有余量：尾部整体规划成 1..tailMaxRows 个铺满行 → 底部平齐、整体矩形
-    if (photos.length - i <= opts.maxRowPhotos) {
-      const tail = planTail(photos, i, width, opts, previousRowHeight)
-      if (tail) {
-        for (const row of tail) {
-          tiles.push(...emitRow(photos, i, row, width, opts.gap, y))
-          y += row.rowHeight + opts.gap
-          previousRowHeight = row.rowHeight
-          i += row.count
-        }
-        break
-      }
-      // planTail 无解（极端比例无法健康铺满）→ 回退逐行 buildRow（special row / 单张兜底）
-    }
-    const plan = buildRow(photos, i, width, opts, previousRowHeight)
+  for (const plan of balancedRows(photos, width, opts)) {
     tiles.push(...emitRow(photos, i, plan, width, opts.gap, y))
     y += plan.rowHeight + opts.gap
-    previousRowHeight = plan.rowHeight
     i += plan.count
   }
   return { tiles, height: tiles.length ? y - opts.gap : 0 }
+}
+
+/** Preserve committed rows during pagination. Only the final two rows, which
+ * meet the loading sentinel, can be regrouped with the newly fetched photos. */
+export function appendMasonry(
+  previous: ReturnType<typeof masonry>,
+  previousPhotos: PhotoSummary[],
+  photos: PhotoSummary[],
+  width: number,
+  density = 2,
+  options?: JustifyOverrides,
+) {
+  if (
+    photos.length <= previousPhotos.length ||
+    previousPhotos.some(
+      (photo, index) =>
+        photo.id !== photos[index]?.id ||
+        photo.width !== photos[index]?.width ||
+        photo.height !== photos[index]?.height,
+    )
+  )
+    return masonry(photos, width, density, options)
+  const opts = mergeJustifyOptions(density, options)
+  const rows = [...new Set(previous.tiles.map((tile) => tile.y))]
+  const from = rows[Math.max(0, rows.length - opts.reflowRows)] ?? 0
+  const kept = previous.tiles
+    .filter((tile) => tile.y < from)
+    .map((tile, index) => ({ ...tile, photo: photos[index] }))
+  const tail = masonry(photos.slice(kept.length), width, density, options)
+  const offset = kept.length ? kept.at(-1)!.y + kept.at(-1)!.height + opts.gap : 0
+  return {
+    tiles: [...kept, ...tail.tiles.map((tile) => ({ ...tile, y: tile.y + offset }))],
+    height: tail.height + offset,
+  }
 }
 
 export function sceneTiles(photos: PhotoSummary[], size: Size, pose: Pose, density = 2): Tile[] {
   if (!photos.length || !size.width || !size.height) return []
   const columns = columnCount(size.width, density),
     cell = size.width / columns
-  const gap = density === 3 ? 8 : 14,
+  const gap = density === 3 ? SURROUND_OPTIONS.denseGap : SURROUND_OPTIONS.gap,
     width = cell - gap
-  const margin = Math.max(cell * 2, size.height * 0.65)
-  const left = Math.floor((pose.x - size.width / 2 - cell * 2) / cell)
-  const right = Math.ceil((pose.x + size.width / 2 + cell * 2) / cell)
+  const margin = Math.max(
+    cell * SURROUND_OPTIONS.overscanColumns,
+    size.height * SURROUND_OPTIONS.overscanHeight,
+  )
+  const left = Math.floor(
+    (pose.x - size.width / 2 - cell * SURROUND_OPTIONS.overscanColumns) / cell,
+  )
+  const right = Math.ceil(
+    (pose.x + size.width / 2 + cell * SURROUND_OPTIONS.overscanColumns) / cell,
+  )
   const tiles: Tile[] = []
   for (let column = left; column <= right; column++) {
     const pool = photos.map((_, i) => photos[modulo(i + column * 5, photos.length)])
-    const heights = pool.map((photo) => (width * photo.height) / photo.width)
+    // Keep tall photos from dominating the surrounding space. Panoramas retain
+    // the full column width; narrower photos approach the same visible area.
+    const widths = pool.map((photo) =>
+      Math.min(
+        width,
+        Math.sqrt((width * width * SURROUND_OPTIONS.areaFactor * photo.width) / photo.height),
+      ),
+    )
+    const heights = pool.map((photo, index) => (widths[index] * photo.height) / photo.width)
     const period = heights.reduce((sum, height) => sum + height + gap, 0)
     const shift = modulo(column, 3) * cell * 0.23
     const low = pose.y - size.height / 2 - margin
@@ -577,7 +376,7 @@ export function sceneTiles(photos: PhotoSummary[], size: Size, pose: Pose, densi
             photo: pool[row],
             x: column * cell + cell / 2,
             y: y + height / 2,
-            width,
+            width: widths[row],
             height,
           })
         y += height + gap
@@ -586,16 +385,14 @@ export function sceneTiles(photos: PhotoSummary[], size: Size, pose: Pose, densi
   }
   return tiles
 }
-export function project(x: number, y: number, size: Size, mode: Exclude<WallMode, 'flat'>) {
+export function project(x: number, y: number, size: Size) {
   const dimension = Math.max(size.width, size.height)
-  const radius = dimension * (mode === 'cylinder' ? 1.65 : 1.05)
+  const radius = dimension * 1.65
   const theta = Math.max(-0.75, Math.min(0.75, x / radius))
-  const phi = mode === 'sphere' ? Math.max(-0.68, Math.min(0.68, y / radius)) : 0
   return {
-    x: radius * Math.sin(theta) * Math.cos(phi),
-    y: mode === 'sphere' ? radius * Math.sin(phi) : y,
-    z: radius * (1 - Math.cos(theta) * Math.cos(phi)),
+    x: radius * Math.sin(theta),
+    y,
+    z: radius * (1 - Math.cos(theta)),
     rotateY: (-theta * 180) / Math.PI,
-    rotateX: (phi * 180) / Math.PI,
   }
 }

@@ -1,11 +1,14 @@
-import { useRef } from 'react'
+import { lazy, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import { Popover } from '@base-ui/react/popover'
-import { useAlbums, useSite } from '../lib/api'
-import { Input, IconButton, Radio, RadioGroup, SelectField, Button } from '../ui/primitives'
+import { useSite } from '../lib/api'
+import { IconButton, Radio, RadioGroup, Spinner } from '../ui/primitives'
 import { Icon, type IconName } from '../ui/icons'
 import { GlassSurface } from '../vendor/GlassSurface'
-import { Appearance } from '../ui/Appearance'
+const Appearance = lazy(() =>
+  import('../ui/Appearance').then((module) => ({ default: module.Appearance })),
+)
+const FilterPanel = lazy(() => import('./FilterPanel'))
 import type { WallMode } from './geometry'
 
 export function GalleryControls({
@@ -25,13 +28,10 @@ export function GalleryControls({
   setSearchOpen: (open: boolean) => void
   total: number
 }) {
-  const site = useSite(),
-    albums = useAlbums(),
-    input = useRef<HTMLInputElement>(null)
+  const site = useSite()
   const modes: { value: WallMode; label: string; icon: IconName }[] = [
     { value: 'flat', label: '平铺', icon: 'grid' },
-    { value: 'cylinder', label: '圆柱', icon: 'cylinder' },
-    { value: 'sphere', label: '球面', icon: 'sphere' },
+    { value: 'surround', label: '环绕', icon: 'surround' },
   ]
   const active = Object.entries(filters).some(
     ([key, value]) => value && key !== 'sort' && key !== 'limit',
@@ -93,85 +93,16 @@ export function GalleryControls({
               sideOffset={14}
               align="center"
             >
-              <Popover.Popup className="popover material filter-panel" initialFocus={input}>
-                <div className="popover-heading">
-                  <Popover.Title>筛选</Popover.Title>
-                  <Button
-                    onClick={() =>
-                      update({ q: '', tag: '', album: '', orientation: '', favorite: '', sort: '' })
-                    }
-                  >
-                    重置
-                  </Button>
-                </div>
-                <label className="search-input">
-                  <Icon name="search" />
-                  <Input
-                    ref={input}
-                    value={filters.q || ''}
-                    onChange={(event) => update({ q: event.target.value })}
-                    placeholder="搜索照片、相机或标签"
-                    aria-label="搜索照片"
-                  />
-                </label>
-                <SelectField
-                  label="照片比例"
-                  value={filters.orientation || 'all'}
-                  onChange={(orientation) => update({ orientation })}
-                  items={[
-                    { value: 'all', label: '所有比例' },
-                    { value: 'landscape', label: '横幅' },
-                    { value: 'portrait', label: '竖幅' },
-                    { value: 'square', label: '方图' },
-                    { value: 'panorama', label: '全景' },
-                  ]}
-                />
-                <SelectField
-                  label="相册"
-                  value={filters.album || ''}
-                  onChange={(album) => update({ album })}
-                  items={[
-                    { value: '', label: '所有相册' },
-                    ...(albums.data?.items || []).map((album) => ({
-                      value: album.id,
-                      label: album.title,
-                    })),
-                  ]}
-                />
-                <SelectField
-                  label="标签"
-                  value={filters.tag || ''}
-                  onChange={(tag) => update({ tag })}
-                  items={[
-                    { value: '', label: '所有标签' },
-                    ...(site.data?.tags || []).map((tag) => ({
-                      value: tag.name,
-                      label: `${tag.name} (${tag.count})`,
-                    })),
-                  ]}
-                />
-                <SelectField
-                  label="排序"
-                  value={filters.sort || 'newest'}
-                  onChange={(sort) => update({ sort })}
-                  items={[
-                    { value: 'newest', label: '新到旧' },
-                    { value: 'oldest', label: '旧到新' },
-                  ]}
-                />
-                <Button
-                  className="favorite-filter"
-                  aria-pressed={filters.favorite === 'true'}
-                  onClick={() => update({ favorite: filters.favorite ? '' : 'true' })}
-                >
-                  <Icon name="star" />
-                  只看精选
-                </Button>
-                <div className="filter-result">
-                  <span>{total} 张照片</span>
-                  <Popover.Close render={<Button variant="solid">完成</Button>} />
-                </div>
-              </Popover.Popup>
+              <Suspense
+                fallback={
+                  <Popover.Popup className="popover material filter-panel">
+                    <Popover.Title>筛选</Popover.Title>
+                    <Spinner label="载入筛选控件" />
+                  </Popover.Popup>
+                }
+              >
+                <FilterPanel filters={filters} update={update} total={total} />
+              </Suspense>
             </Popover.Positioner>
           </Popover.Portal>
         </Popover.Root>
@@ -186,7 +117,9 @@ export function GalleryControls({
             >
               <Popover.Popup className="popover material appearance-panel">
                 <Popover.Title className="sr-only">显示设置</Popover.Title>
-                <Appearance />
+                <Suspense fallback={<Spinner label="载入显示设置" />}>
+                  <Appearance />
+                </Suspense>
               </Popover.Popup>
             </Popover.Positioner>
           </Popover.Portal>

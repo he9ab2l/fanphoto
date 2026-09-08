@@ -24,7 +24,12 @@
   --layer-controls: 10;
   --layer-popover: 30;
   --layer-dialog: 50;
+  --layer-sheet: 60;
   --layer-select: 70;
+  --layer-tooltip: 80;
+  --layer-toast: 90;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 :root[data-theme='dark'] {
   --canvas: #101010;
@@ -106,6 +111,19 @@ textarea {
 :focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 4px;
+}
+.photo-opening {
+  position: fixed;
+  inset: 24px;
+  z-index: var(--layer-dialog);
+  display: grid;
+  place-items: center;
+  outline: none;
+}
+.photo-opening-close {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
 }
 button:disabled,
 [data-disabled] {
@@ -628,4 +646,29 @@ textarea::placeholder {
     padding: 22px;
     max-height: calc(100dvh - 40px);
   }
+}
+
+.tooltip-positioner {
+  z-index: var(--layer-tooltip);
+}
+.tooltip {
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--canvas);
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: var(--shadow);
+  transition: opacity 120ms ease-out;
+}
+.tooltip[data-starting-style],
+.tooltip[data-ending-style] {
+  opacity: 0;
+}
+
+.detail-backdrop {
+  background: rgb(12 12 12 / 30%);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
 }

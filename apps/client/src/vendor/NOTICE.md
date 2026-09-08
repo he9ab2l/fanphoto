@@ -1,10 +1,11 @@
 # Application-only component adaptations
 
 Source: the user's local `ui-libraries/components/react-bits`, commit `0e69e73`.
-Masonry's shortest-column placement is extended for true aspect ratios and panorama spans.
-DomeGallery's perspective / tangent-plane and gesture concepts support separate cylinder
-and sphere surfaces, with recycled visible columns and no built-in full-screen enlargement.
-GlassSurface uses the documented cross-browser CSS fallback with monochrome theme tokens.
+Masonry is adapted into globally balanced, proportional justified rows and stable pagination.
+DomeGallery's perspective / tangent-plane and gesture concepts are used by SurroundGallery:
+one horizontally curved, infinitely recycled surface without image mesh deformation.
+GlassSurface uses monochrome CSS frosting plus a small-surface, neutral-center RG displacement
+adapted from the upstream map. Firefox/WebKit and accessibility preferences keep the CSS fallback.
 
 Adaptations are used only as part of FanPhoto, not distributed as a component library.
 The original license is included beside this notice.

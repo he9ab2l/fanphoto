@@ -8,24 +8,24 @@ import { useGesture } from '@use-gesture/react'
 import { useReducedMotion } from 'motion/react'
 import type { PhotoSummary } from '@fanphoto/contracts'
 import { project, sceneTiles, columnCount, type Pose, type Size } from '../gallery/geometry'
-import { imageSet } from '../lib/photos'
+import { GalleryImage } from '../ui/PhotoImage'
 import { Button } from '../ui/primitives'
 
-export function DomeGallery({
+export function SurroundGallery({
   photos,
-  mode,
   density,
   paused,
   pose,
   onOpen,
+  onIntent,
   onExplore,
 }: {
   photos: PhotoSummary[]
-  mode: 'cylinder' | 'sphere'
   density: number
   paused: boolean
   pose: MutableRefObject<Pose | null>
-  onOpen: (photo: PhotoSummary) => void
+  onOpen: (photo: PhotoSummary, preview?: string) => void
+  onIntent?: (photo: PhotoSummary) => void
   onExplore: () => void
 }) {
   const root = useRef<HTMLDivElement>(null)
@@ -38,7 +38,6 @@ export function DomeGallery({
   const dragStart = useRef({ x: 0, y: 0 }),
     dragging = useRef(false)
   const lastFrame = useRef(0),
-    lastLayout = useRef(0),
     suppressClick = useRef(false)
   const travel = useRef(0),
     reduced = useReducedMotion()
@@ -47,9 +46,9 @@ export function DomeGallery({
     () => sceneTiles(photos, size, windowPose, density),
     [photos, size, windowPose, density],
   )
-  const latest = useRef({ size, mode, tiles, windowPose, density, paused, reduced, onExplore })
+  const latest = useRef({ size, tiles, windowPose, density, paused, reduced, onExplore })
   useLayoutEffect(() => {
-    latest.current = { size, mode, tiles, windowPose, density, paused, reduced, onExplore }
+    latest.current = { size, tiles, windowPose, density, paused, reduced, onExplore }
   })
   const schedule = () => {
     if (!raf.current && !document.hidden)
@@ -69,11 +68,11 @@ export function DomeGallery({
       if (!node) continue
       const x = tile.x - camera.x,
         y = tile.y - camera.y
-      const point = project(x, y, current.size, current.mode)
+      const point = project(x, y, current.size)
       const visible =
         Math.abs(x) < current.size.width / 2 + tile.width * 0.6 &&
         Math.abs(y) < current.size.height / 2 + tile.height * 0.6
-      node.style.transform = `translate3d(${current.size.width / 2 + point.x - tile.width / 2}px,${current.size.height / 2 + point.y - tile.height / 2}px,${point.z}px) rotateY(${point.rotateY}deg) rotateX(${point.rotateX}deg)`
+      node.style.transform = `translate3d(${current.size.width / 2 + point.x - tile.width / 2}px,${current.size.height / 2 + point.y - tile.height / 2}px,${point.z}px) rotateY(${point.rotateY}deg)`
       node.style.visibility = visible ? 'visible' : 'hidden'
       node.tabIndex = visible && !current.paused ? 0 : -1
       node.setAttribute('aria-hidden', String(!visible))
@@ -95,11 +94,9 @@ export function DomeGallery({
     paint()
     const threshold = (current.size.width / columnCount(current.size.width, current.density)) * 0.6
     if (
-      time - lastLayout.current > 100 &&
-      (Math.abs(pose.current.x - current.windowPose.x) > threshold ||
-        Math.abs(pose.current.y - current.windowPose.y) > threshold)
+      Math.abs(pose.current.x - current.windowPose.x) > threshold ||
+      Math.abs(pose.current.y - current.windowPose.y) > threshold
     ) {
-      lastLayout.current = time
       setWindowPose({ ...pose.current })
     }
     if (Math.abs(velocity.current.x) + Math.abs(velocity.current.y) > 5) schedule()
@@ -118,7 +115,7 @@ export function DomeGallery({
   }, [pose])
   useLayoutEffect(() => {
     paint()
-  }, [tiles, size, mode, paused])
+  }, [tiles, size, paused])
   useEffect(() => {
     const visibility = () => {
       if (document.hidden) stop()
@@ -197,8 +194,8 @@ export function DomeGallery({
       className="immersive-wall"
       tabIndex={paused ? -1 : 0}
       data-testid="immersive-wall"
-      data-curvature={mode}
-      aria-label={`${mode === 'cylinder' ? '圆柱' : '球面'}照片墙，拖动或使用方向键探索`}
+      data-curvature="surround"
+      aria-label="环绕照片墙，拖动、滚动或使用方向键无限探索"
       onPointerDownCapture={() => {
         // A fresh press is new intent, even immediately after inertia/drag.
         // Only suppress the synthetic click belonging to the drag itself.
@@ -239,24 +236,24 @@ export function DomeGallery({
             data-photo-id={tile.photo.id}
             aria-label={`查看照片：${tile.photo.title}`}
             style={{ width: tile.width, height: tile.height }}
+            onPointerEnter={() => {
+              if (!dragging.current) onIntent?.(tile.photo)
+            }}
+            onFocus={() => onIntent?.(tile.photo)}
             onClick={(event) => {
               if (event.detail !== 0 && suppressClick.current) {
                 suppressClick.current = false
                 return
               }
               stop()
-              onOpen(tile.photo)
+              onOpen(tile.photo, event.currentTarget.querySelector('img')?.currentSrc)
             }}
           >
-            <img
-              src={tile.photo.assets.sm.url}
-              srcSet={imageSet(tile.photo)}
-              sizes={`${Math.ceil(tile.width)}px`}
-              width={tile.photo.width}
-              height={tile.photo.height}
-              alt={tile.photo.title}
-              draggable={false}
-              decoding="async"
+            <GalleryImage
+              photo={tile.photo}
+              width={tile.width}
+              height={tile.height}
+              background={paused}
             />
           </Button>
         ))}

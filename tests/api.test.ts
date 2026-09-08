@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readdir, mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { gzipSync, gunzipSync, brotliCompressSync, brotliDecompressSync } from 'node:zlib'
 import { harness, fixture, testPassword } from './helpers'
 import { sha256 } from '../apps/server/src/modules/media/processor'
 import { builtinModules } from '../apps/server/src/modules/media/modules'
@@ -12,15 +13,48 @@ test('security headers survive standalone HTML, media and download responses', a
   try {
     const root = resolve(h.directory, 'static')
     await mkdir(resolve(root, 'apps/client/dist'), { recursive: true })
-    await writeFile(resolve(root, 'apps/client/dist/index.html'), '<!doctype html><title>Fixture</title>')
+    const html = '<!doctype html><title>Fixture</title>'
+    await writeFile(resolve(root, 'apps/client/dist/index.html'), html)
+    await writeFile(resolve(root, 'apps/client/dist/index.html.gz'), gzipSync(html))
+    await writeFile(resolve(root, 'apps/client/dist/index.html.br'), brotliCompressSync(html))
     const app = createApp({ ...h, config: { ...h.config, root } })
     for (const method of ['GET', 'HEAD']) {
-      const response = await app.request('https://fanphoto.test/', { method }, { clientIp: '127.0.0.1' })
+      const response = await app.request(
+        'https://fanphoto.test/',
+        { method },
+        { clientIp: '127.0.0.1' },
+      )
       assert.equal(response.status, 200)
       assert.match(response.headers.get('content-security-policy') || '', /script-src 'self'/)
       assert.equal(response.headers.get('x-content-type-options'), 'nosniff')
       assert.equal(response.headers.get('x-frame-options'), 'DENY')
       assert.match(response.headers.get('x-robots-tag') || '', /noindex/)
+    }
+    for (const encoding of ['gzip', 'br']) {
+      const response = await app.request(
+        'https://fanphoto.test/',
+        { headers: { 'accept-encoding': encoding } },
+        { clientIp: '127.0.0.1' },
+      )
+      assert.equal(response.headers.get('content-encoding'), encoding)
+      assert.match(response.headers.get('vary') || '', /Accept-Encoding/)
+      assert.equal(response.headers.get('x-content-type-options'), 'nosniff')
+      const compressed = Buffer.from(await response.arrayBuffer())
+      assert.equal(
+        (encoding === 'gzip'
+          ? gunzipSync(compressed)
+          : brotliDecompressSync(compressed)
+        ).toString(),
+        html,
+      )
+      const unchanged = await app.request(
+        'https://fanphoto.test/',
+        {
+          headers: { 'accept-encoding': encoding, 'if-none-match': response.headers.get('etag')! },
+        },
+        { clientIp: '127.0.0.1' },
+      )
+      assert.equal(unchanged.status, 304)
     }
     await h.login()
     const photo = (await h.upload(await fixture(420, 310))).photo
@@ -31,7 +65,9 @@ test('security headers survive standalone HTML, media and download responses', a
       assert.equal(response.headers.get('x-frame-options'), 'DENY')
       await response.body?.cancel()
     }
-  } finally { await h.close() }
+  } finally {
+    await h.close()
+  }
 })
 
 test('fresh v1 contract, no old API compatibility or anonymous admin access', async () => {
@@ -172,6 +208,15 @@ test('stable pagination, search escaping, orientation, filters and context-aware
     await h.upload(await fixture(700, 700), { title: 'Square' })
     await h.upload(await fixture(2400, 500), { title: 'Panorama' })
     const first = await (await h.request('/api/v1/photos?limit=2')).json()
+    const compressed = await h.request('/api/v1/photos?limit=2', 'GET', undefined, false, {
+      'accept-encoding': 'gzip',
+    })
+    assert.equal(compressed.headers.get('content-encoding'), 'gzip')
+    assert.equal(compressed.headers.get('cache-control'), 'no-store')
+    assert.deepEqual(
+      JSON.parse(gunzipSync(Buffer.from(await compressed.arrayBuffer())).toString()).items,
+      first.items,
+    )
     const second = await (
       await h.request(`/api/v1/photos?limit=2&cursor=${first.page.nextCursor}`)
     ).json()
