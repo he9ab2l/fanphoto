@@ -29,8 +29,8 @@
 ## 系统要求
 
 - Node 24 LTS、pnpm 9。
-- sharp 需要平台原生二进制：本地 Termux（android-arm64）仅能通过类型检查与前端构建；
-  API / 媒体集成测试需在 linux x86_64（如 ten 测试服务器）执行。
+- sharp 需要平台原生二进制：arm64 平台仅能通过类型检查与前端构建；
+  API / 媒体集成测试需在 linux x86_64 环境执行。
 
 ## 项目结构
 
@@ -42,7 +42,7 @@ scripts/             setup（建 .env）/ import（原片导入）/ backup / bui
 deploy/              systemd、原子发布、Caddy 配置替换、旧站归档
 tests/               API、媒体、几何、查看器、HTTP 缓存、部署配置、限额单测
 tools/               风景图下载、原片核验、域名验收、许可 NOTICE / 来源再生
-docs/                架构、API、玻璃引擎、运维、验收、照片来源与清单
+docs/                架构、API、玻璃引擎、照片来源与清单
 ```
 
 ## 本地开发
@@ -63,8 +63,7 @@ pnpm start
 
 ## 环境变量
 
-见 [.env.example](.env.example)，完整配置说明在
-[docs/operations.md](docs/operations.md)。核心项：
+见 [.env.example](.env.example)。核心项：
 
 | 变量                             | 说明                                    |
 | -------------------------------- | --------------------------------------- |
@@ -84,11 +83,11 @@ pnpm start
 
 ```bash
 pnpm build                        # typecheck + 客户端构建 + 服务端 esbuild 打包 + Brotli/gzip
-bash deploy/release.sh            # 在服务器 workspace：install→build→test→停写备份→原子切换→健康检查
+bash deploy/release.sh            # 服务器 workspace：install→build→test→停写备份→原子切换→健康检查
 ```
 
 生产部署为不可变 release + `current` 符号链接原子切换，systemd `fanphoto.service` 托管，
-Caddy 反向代理并强制 HTTPS。详见 [docs/operations.md](docs/operations.md)。
+Caddy 反向代理并强制 HTTPS；发布脚本自带失败自动回滚。
 
 ## 测试照片
 
@@ -101,8 +100,6 @@ Caddy 反向代理并强制 HTTPS。详见 [docs/operations.md](docs/operations.
 - [架构与扩展设计](docs/ARCHITECTURE.md)
 - [API 契约](docs/API.md)
 - [玻璃引擎](docs/glass-engine-architecture.md)
-- [开发、部署与恢复](docs/operations.md)
-- [验收记录](docs/acceptance.md)
 - [照片来源](docs/photo-sources.md)
 
 ## License
