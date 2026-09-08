@@ -21,10 +21,10 @@
   --glass-bg-strong: oklch(0.955 0.002 250 / 0.94);
   --glass-line: rgb(255 255 255 / 52%);
   --glass-edge: rgb(0 0 0 / 9%);
-  /* Dynamic light (GlassLight.ts publishes pointer-driven values). */
-  --glass-light-x: 0.5;
-  --glass-light-y: 0.2;
-  --glass-intensity: 0;
+  /* Dynamic specular highlight (GlassSurface writes these per pointer frame). */
+  --glass-spec-x: 30%;
+  --glass-spec-y: 20%;
+  --glass-spec-intensity: 0.4;
 }
 :root[data-theme='dark'] {
   --glass-blur: 26px;
@@ -97,8 +97,12 @@
   border-radius: inherit;
   pointer-events: none;
   z-index: 1;
-  /* Inner edge = glass thickness: a faint dark line hugging the rim. */
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--glass-edge) 45%, transparent);
+  /* Glass thickness: a fresnel ring hugging the inner edge (strength follows
+   * the material), plus a faint dark line exactly at the rim. */
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--glass-edge) 45%, transparent),
+    inset 0 0 calc(var(--glass-radius) * 0.9 + 8px)
+      rgb(255 255 255 / calc(var(--glass-rim-strength, 0.6) * 0.13));
 }
 
 /* WebGL lens canvas sits under the highlights and the content. */

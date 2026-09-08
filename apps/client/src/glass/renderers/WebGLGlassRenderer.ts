@@ -65,12 +65,14 @@ void main() {
            - sdBox(css - h - vec2(eps, 0.0), h, u_radius);
   float dy = sdBox(css - h + vec2(0.0, eps), h, u_radius)
            - sdBox(css - h - vec2(0.0, eps), h, u_radius);
-  vec2 normal = normalize(vec2(dx, dy));
+  vec2 normal = vec2(dx, dy) / max(length(vec2(dx, dy)), 1e-4);
 
-  float inside = smoothstep(2.0, -2.0, d);
-  float edgeFactor = clamp(-d / u_rim_band, 0.0, 1.0);
-  // Center refracts slightly, edges refract more (IOR ≈ 1.3–1.5 look).
-  float strength = 0.22 + 0.78 * edgeFactor;
+  // 1 inside the pane, 0 outside (edge d=0).
+  float inside = 1.0 - smoothstep(-2.0, 2.0, d);
+  // 1 at the rim edge, decaying to 0 u_rim_band deep inside: refraction lives
+  // only in this band — the flat interior of a pane does not bend light.
+  float band = clamp(1.0 + d / u_rim_band, 0.0, 1.0);
+  float strength = band * (0.35 + 0.65 * band);
   vec2 refracted = v_uv - (normal * u_refraction * strength) / u_size;
 
   // Frost: separable-looking 3×3 gaussian [1 2 1]^2, radius = blur sigma.
@@ -86,8 +88,9 @@ void main() {
   }
   vec3 base = acc / accW;
 
-  // Edge-only RGB dispersion: R +1px, B −1px (very restrained).
-  vec2 ca = (vec2(0.6, 0.0) * edgeFactor) / u_size;
+  // Rim-only RGB dispersion: R +1px, B −1px, squared falloff keeps the
+  // interior clean (very restrained).
+  vec2 ca = (vec2(0.6, 0.0) * band * band) / u_size;
   base.r = texture2D(u_tex, refracted + ca).r;
   base.b = texture2D(u_tex, refracted - ca).b;
 
@@ -96,8 +99,9 @@ void main() {
   vec3 colored = mix(vec3(lum), base, u_saturation);
   vec3 tinted = mix(colored, u_tint, u_tint_mix * inside);
 
-  // Fresnel rim light on the inner edge.
-  float rimGlow = pow(1.0 - inside, 1.6) * u_rim * 0.35;
+  // Fresnel rim light: a bright ring hugging the inner edge only.
+  float ring = clamp(1.0 + d / max(u_rim_band * 0.5, 3.0), 0.0, 1.0) * inside;
+  float rimGlow = pow(ring, 2.2) * u_rim * 0.45;
   vec3 result = tinted + vec3(rimGlow);
 
   gl_FragColor = vec4(result, 1.0);

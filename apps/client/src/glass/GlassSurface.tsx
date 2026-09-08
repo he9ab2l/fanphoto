@@ -31,7 +31,6 @@ import { subscribeGlassLight, type GlassLightState } from './GlassLight'
 import { withinLensBudget, lensFieldDataUrl } from './displacement/lens-field'
 import { SVGGlassFilter } from './renderers/SVGGlassRenderer'
 import type { WebGLGlassRenderer as WebGLRendererType } from './renderers/WebGLGlassRenderer'
-type WebGLGlassRenderer = WebGLRendererType
 
 const InteractiveGlassSurface = lazy(() => import('./GlassMotion'))
 
@@ -91,21 +90,23 @@ export function GlassSurface({
   const [liquid, setLiquid] = useState(false)
   const [map, setMap] = useState('')
   const [webglActive, setWebglActive] = useState(false)
-  const webglRef = useRef<WebGLGlassRenderer | null>(null)
+  const webglRef = useRef<WebGLRendererType | null>(null)
   const webglCanvas = useRef<HTMLCanvasElement | null>(null)
   const painterRef = useRef(webgl?.paintBackdrop)
   useEffect(() => {
     painterRef.current = webgl?.paintBackdrop
   }, [webgl?.paintBackdrop])
 
-  // The WebGL renderer is only needed by the hero lens (photo dialog); load it
-  // lazily so the gallery entry chunk stays lean.
+  // The WebGL renderer is only needed by the hero lens (photo dialog); probe
+  // it lazily — and only on surfaces that actually ask for it — so the gallery
+  // entry chunk and its controls never download the WebGL module.
   const loadWebGL = useCallback(async () => {
     const module = await import('./renderers/WebGLGlassRenderer')
     return module.WebGLGlassRenderer
   }, [])
   const [webglAvailable, setWebglAvailable] = useState(false)
   useEffect(() => {
+    if (!webgl?.enabled) return
     let alive = true
     void loadWebGL().then((WebGLGlassRenderer) => {
       if (alive) setWebglAvailable(WebGLGlassRenderer.supported())
@@ -113,7 +114,7 @@ export function GlassSurface({
     return () => {
       alive = false
     }
-  }, [loadWebGL])
+  }, [webgl?.enabled, loadWebGL])
 
   // Environment tint ------------------------------------------------------
   const photoTint = useMemo(
@@ -198,7 +199,7 @@ export function GlassSurface({
     if (!canvas) return
     let alive = true
     let cancelled = false
-    let renderer: WebGLGlassRenderer | null = null
+    let renderer: WebGLRendererType | null = null
     void loadWebGL().then((WebGLGlassRenderer) => {
       if (cancelled || !alive) return
       renderer = new WebGLGlassRenderer(canvas, {
@@ -256,22 +257,19 @@ export function GlassSurface({
   }, [paintKey, webglWanted, activeTint, spec.tint])
 
   // Dynamic specular light -------------------------------------------------
-  const [specLight, setSpecLight] = useState<{ x: number; y: number; intensity: number }>({
-    x: 0.3,
-    y: 0.2,
-    intensity: 0.4,
-  })
+  // Light positions are written straight to the surface element as CSS
+  // variables — pointer movement must never re-render the React tree. The
+  // rect is cached and re-measured only on resize/scroll (cheap reads, and
+  // the light system keeps the loop alive for exactly as long as it moves).
   useEffect(() => {
     if (!specular) return
     const node = root.current
     if (!node) return
     let rect = node.getBoundingClientRect()
     const measure = () => {
-      if (root.current) rect = root.current.getBoundingClientRect()
+      rect = node.getBoundingClientRect()
     }
     const onLight = (state: GlassLightState) => {
-      if (!root.current) return
-      measure()
       const px = state.x * window.innerWidth
       const py = state.y * window.innerHeight
       const cx = rect.left + rect.width / 2
@@ -282,13 +280,17 @@ export function GlassSurface({
       const localX = Math.min(1, Math.max(0, (px - rect.left) / Math.max(rect.width, 1)))
       const localY = Math.min(1, Math.max(0, (py - rect.top) / Math.max(rect.height, 1)))
       const intensity = 0.3 + 0.7 * falloff * state.intensity
-      setSpecLight({ x: localX, y: localY, intensity })
+      node.style.setProperty('--glass-spec-x', `${(localX * 100).toFixed(2)}%`)
+      node.style.setProperty('--glass-spec-y', `${(localY * 100).toFixed(2)}%`)
+      node.style.setProperty('--glass-spec-intensity', intensity.toFixed(2))
     }
     const unsubscribe = subscribeGlassLight(onLight)
     window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, { passive: true, capture: true })
     return () => {
       unsubscribe()
       window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure, { capture: true } as EventListenerOptions)
     }
   }, [specular])
 
@@ -309,9 +311,6 @@ export function GlassSurface({
     ...materialVars(material, theme),
     '--glass-radius': `${radius}px`,
     '--glass-bg': background,
-    '--glass-spec-x': `${specLight.x * 100}%`,
-    '--glass-spec-y': `${specLight.y * 100}%`,
-    '--glass-spec-intensity': String(specLight.intensity.toFixed(2)),
     ...(filterId ? { '--glass-filter': filterId } : {}),
     ...(style || {}),
   } as CSSProperties
@@ -343,7 +342,6 @@ export function GlassSurface({
           saturation={spec.saturation}
           brightness={spec.brightness}
           dispersion={spec.dispersion}
-          lighting={material === 'regular'}
           map={map}
         />
       )}

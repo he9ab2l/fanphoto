@@ -1,6 +1,7 @@
-/** Lighting System. One rAF-throttled global listener samples pointer,
- * viewport and scroll, publishes document-level --glass-light-* variables, and
- * notifies specular surfaces so they can light themselves locally. */
+/** Lighting System. One rAF-throttled global listener samples the pointer and
+ * notifies specular surfaces so they can light themselves locally. The loop
+ * self-terminates once the pointer has been idle for a moment — no frame is
+ * burned while the page rests — and pointer/scroll events re-arm it. */
 export interface GlassLightState {
   /** pointer in viewport fractions (0..1), viewport center when idle. */
   x: number
@@ -10,41 +11,39 @@ export interface GlassLightState {
   active: boolean
 }
 
-const LIGHT_EVENT = 'fanphoto:glass'
+const IDLE_AFTER_MS = 220
+
 const listeners = new Set<(state: GlassLightState) => void>()
 let running = false
 let pointer = { x: 0.5, y: 0.5 }
 let movedAt = 0
 let raf = 0
+let scheduled = false
 
 function compute(): GlassLightState {
-  const moving = performance.now() - movedAt < 220
-  const intensity = moving ? 1 : 0
-  return { ...pointer, intensity, active: moving }
+  const moving = performance.now() - movedAt < IDLE_AFTER_MS
+  return { ...pointer, intensity: moving ? 1 : 0, active: moving }
 }
 
-function tick() {
-  raf = 0
-  const state = compute()
-  const root = document.documentElement
-  root.style.setProperty('--glass-light-x', String(state.x))
-  root.style.setProperty('--glass-light-y', String(state.y))
-  root.style.setProperty('--glass-intensity', String(state.intensity))
-  if (listeners.size) {
-    window.dispatchEvent(new CustomEvent(LIGHT_EVENT, { detail: state }))
-  }
-  // Stay silent once idle: no listener loop while the pointer rests.
-  if (listeners.size) requestTick()
-}
-
-let scheduled = false
 function requestTick() {
-  if (scheduled) return
+  if (scheduled || raf) return
   scheduled = true
   raf = requestAnimationFrame(() => {
     scheduled = false
     tick()
   })
+}
+
+function tick() {
+  raf = 0
+  const state = compute()
+  if (listeners.size) {
+    window.dispatchEvent(new CustomEvent('fanphoto:glass', { detail: state }))
+  }
+  // Keep ticking only while the light is live; the frame that observes the
+  // idle threshold publishes intensity 0 and lets the loop die. Any pointer
+  // or scroll event re-arms it.
+  if (listeners.size && state.active) requestTick()
 }
 
 function schedule() {
@@ -68,7 +67,6 @@ export function startGlassLight(): () => void {
   const onScroll = () => schedule()
   window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('resize', onScroll, { passive: true })
-  tick()
   return () => {
     running = false
     window.removeEventListener('pointermove', onPointer)
@@ -76,6 +74,8 @@ export function startGlassLight(): () => void {
     window.removeEventListener('scroll', onScroll)
     window.removeEventListener('resize', onScroll)
     if (raf) cancelAnimationFrame(raf)
+    raf = 0
+    scheduled = false
   }
 }
 
@@ -87,5 +87,3 @@ export function subscribeGlassLight(listener: (state: GlassLightState) => void):
     listeners.delete(listener)
   }
 }
-
-export { LIGHT_EVENT }

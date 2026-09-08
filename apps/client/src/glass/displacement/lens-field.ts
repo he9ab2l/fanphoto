@@ -1,7 +1,10 @@
-/** Optical lens field. One rasterized RG displacement texture per surface size:
- * height field from the SDF rounded box, surface normals, center region with a
- * slight lens refraction and stronger refraction toward the rim (IOR ≈ 1.3–1.5
- * look). R = 128 + x displacement, G = 128 + y displacement. */
+/** Optical lens field. One rasterized RG displacement texture per surface size.
+ * Edge-band refraction only: the interior stays neutral (a flat pane does not
+ * bend light), displacement ramps up inside a narrow band at the rim — this
+ * also avoids the nearest-edge normal flip across the pane midline that a
+ * whole-pane field would produce (visible seam artifacts).
+ * R = 128 + x displacement, G = 128 + y displacement, A = rim height (for
+ * edge lighting consumers). */
 import { sdRoundedBox, sdfNormal } from './sdf'
 import { cachedOrCompute } from './cache'
 
@@ -11,9 +14,9 @@ export interface LensField {
   pixels: Uint8ClampedArray
 }
 
-export const LENS_MAX_WIDTH = 640
-export const LENS_MAX_HEIGHT = 160
-export const LENS_BUDGET = 60_000
+export const LENS_MAX_WIDTH = 1024
+export const LENS_MAX_HEIGHT = 900
+export const LENS_BUDGET = 280_000
 
 export const withinLensBudget = (width: number, height: number) =>
   width > 0 &&
@@ -44,7 +47,9 @@ export function lensFieldDataUrl(
   })
 }
 
-/** Compute the height/normal field for a rounded-box glass lens. */
+const smoothstep = (t: number) => t * t * (3 - 2 * t)
+
+/** Compute the edge-band displacement field for a rounded-box glass lens. */
 export function lensField(
   surfaceW: number,
   surfaceH: number,
@@ -57,11 +62,8 @@ export function lensField(
   const halfW = w / 2
   const halfH = h / 2
   const radius = Math.max(4, Math.min(radiusPx * scale, halfW, halfH))
-  const band = Math.max(3, Math.min(14, h * 0.22))
-  /** Center acts as a weak lens too (the whole pane refracts); edges add the
-   * pronounced rim bending that reads as glass thickness. */
-  const centerStrength = 0.35 * strength
-  const edgeStrength = 1.15 * strength
+  const band = Math.max(4, Math.min(18, Math.min(w, h) * 0.28))
+  const edgeStrength = 1.35 * strength
 
   const pixels = new Uint8ClampedArray(w * h * 4)
   for (let y = 0; y < h; y++) {
@@ -69,16 +71,26 @@ export function lensField(
       const px = x + 0.5 - halfW
       const py = y + 0.5 - halfH
       const distance = sdRoundedBox(px, py, halfW, halfH, radius)
-      const [nx, ny] = sdfNormal(px, py, halfW, halfH, radius)
-      // 0 at the rim edge, growing to 1 a few px inside; 0 outside the pane.
-      const edgeFalloff = distance < 0 ? Math.min(1, Math.max(0, 1 + distance / band) ** 2) : 0
-      const amount = centerStrength + edgeFalloff * edgeStrength
       const i = (y * w + x) * 4
+      // 0 deep inside the pane (flat glass — no displacement), 1 at the rim.
+      const falloff =
+        distance < 0 ? smoothstep(Math.min(1, Math.max(0, 1 + distance / band))) : 1
+      const height = falloff * falloff
+      if (height <= 0) {
+        // Interior: neutral displacement, zero rim height.
+        pixels[i] = 128
+        pixels[i + 1] = 128
+        pixels[i + 2] = 128
+        pixels[i + 3] = 0
+        continue
+      }
+      const [nx, ny] = sdfNormal(px, py, halfW, halfH, radius)
+      const amount = edgeStrength * height
       // Refraction bends toward the pane center: invert the outward normal.
       pixels[i] = 128 - nx * amount * 100
       pixels[i + 1] = 128 - ny * amount * 100
       pixels[i + 2] = 128
-      pixels[i + 3] = 255
+      pixels[i + 3] = Math.round(height * 255)
     }
   }
   return { width: w, height: h, pixels }

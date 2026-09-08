@@ -87,27 +87,32 @@ test('only an explicit retry changes an image URL', () => {
   assert.equal(retryImageUrl('/media/lg', 1), '/media/lg?retry=1')
 })
 
-test('lens field is deterministic, refracts slightly at the center and stronger at rims, and is budgeted', () => {
+test('lens field is deterministic, keeps the interior flat and bends light only in the rim band, and is budgeted', () => {
   const map = lensField(300, 56, 28)
   assert.deepEqual(map, lensField(300, 56, 28))
   const centerIndex = (28 * 300 + 150) * 4
   const centerR = map.pixels[centerIndex]
   const centerG = map.pixels[centerIndex + 1]
-  // Center stays a weak, nearly neutral lens (the pane refracts even at its
-  // middle — per spec — but never hard). Rim bending must be clearly stronger.
-  assert.ok(Math.abs(centerR - 128) <= 40, `center R ${centerR}`)
-  assert.ok(Math.abs(centerG - 128) <= 40, `center G ${centerG}`)
-  // Rim pixels refract much more than the center (the pane bends vertically
-  // at top/bottom edges, so evaluate both displacement channels).
+  // The interior of a pane is flat glass: perfectly neutral displacement, no
+  // rim height. (A whole-pane field would flip its normal across the pane
+  // midline and draw a visible seam — the bug this guards against.)
+  assert.equal(centerR, 128, `center R ${centerR}`)
+  assert.equal(centerG, 128, `center G ${centerG}`)
+  assert.equal(map.pixels[centerIndex + 3], 0)
+  // Rim pixels bend light toward the pane center (top edge → +G) and carry
+  // rim height in alpha for the lighting consumers.
   const rimIndex = (1 * 300 + 150) * 4
-  const centerStrength = Math.max(Math.abs(centerR - 128), Math.abs(centerG - 128))
-  const rimStrength = Math.max(
-    Math.abs(map.pixels[rimIndex] - 128),
-    Math.abs(map.pixels[rimIndex + 1] - 128),
-  )
-  assert.ok(rimStrength > centerStrength, `rim ${rimStrength} vs center ${centerStrength}`)
+  assert.ok(map.pixels[rimIndex + 1] - 128 > 20, 'top rim bends downward (inward)')
+  assert.ok(map.pixels[rimIndex + 3] > 200, 'rim carries height')
+  // Displacement must be continuous: no jump across the pane midline.
+  const midLeft = (28 * 300 + 60) * 4
+  const midRight = (28 * 300 + 240) * 4
+  assert.equal(map.pixels[midLeft], 128)
+  assert.equal(map.pixels[midRight], 128)
   assert.ok(withinLensBudget(400, 60))
+  assert.ok(withinLensBudget(380, 680), 'detail panel fits the liquid budget')
+  assert.ok(withinLensBudget(320, 640), 'mobile sheet fits the liquid budget')
+  assert.equal(withinLensBudget(500, 700), false, 'surfaces past the pixel budget stay frosted')
   assert.equal(withinLensBudget(1440, 900), false)
-  assert.equal(withinLensBudget(320, 640), false)
   assert.equal(withinLensBudget(0, 0), false)
 })
