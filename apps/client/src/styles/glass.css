@@ -25,6 +25,8 @@
   --glass-spec-x: 30%;
   --glass-spec-y: 20%;
   --glass-spec-intensity: 0.4;
+  /* Scrim blur sits between ultraThin and thin materials. */
+  --glass-scrim-blur: 12px;
 }
 :root[data-theme='dark'] {
   --glass-blur: 26px;

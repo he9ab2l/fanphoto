@@ -6,6 +6,7 @@ import {
   project,
   sceneTiles,
   modulo,
+  columnCount,
   DEFAULT_JUSTIFY_OPTIONS,
   appendMasonry,
   mergeJustifyOptions,
@@ -285,4 +286,68 @@ test('layout options can override one nested field without discarding other defa
   assert.equal(opts.weights.flow, DEFAULT_JUSTIFY_OPTIONS[2].weights.flow)
   assert.equal(opts.soft.max, DEFAULT_JUSTIFY_OPTIONS[2].soft.max)
   assert.equal(opts.soft.min, 100)
+})
+
+test('surround density matches the flat wall: same gaps, portraits fill columns', () => {
+  for (const width of [390, 768, 1440])
+    for (const density of [1, 2, 3]) {
+      const size = { width, height: Math.round(width * 0.625) }
+      const tiles = sceneTiles(realPhotos, size, { x: width / 2, y: size.height / 2 }, density)
+      const gap = density === 3 ? 6 : 10
+      assert.equal(gap, DEFAULT_JUSTIFY_OPTIONS[density].gap, 'gap schedule mirrors flat mode')
+      const cell = width / columnCount(width, density)
+      for (const tile of tiles) {
+        const ratio = tile.photo.width / tile.photo.height
+        if (ratio >= 1) {
+          assert.ok(
+            Math.abs(tile.width / (cell - gap) - Math.min(1, Math.sqrt(ratio))) < 1e-9,
+          )
+        } else {
+          assert.ok(
+            tile.width / (cell - gap) >= 0.7,
+            `portrait fill ${tile.width / (cell - gap)} at ${width}/${density}`,
+          )
+        }
+      }
+      const byColumn = new Map<number, typeof tiles>()
+      for (const tile of tiles) {
+        const column = Math.round((tile.x - cell / 2) / cell)
+        byColumn.set(column, [...(byColumn.get(column) || []), tile])
+      }
+      for (const [column, list] of byColumn) {
+        list.sort((a, b) => a.y - b.y)
+        for (let i = 1; i < list.length; i++) {
+          const spacing = list[i].y - list[i].height / 2 - (list[i - 1].y + list[i - 1].height / 2)
+          assert.ok(
+            Math.abs(spacing - gap) < 1e-6,
+            `column ${column} spacing ${spacing} != gap ${gap}`,
+          )
+        }
+      }
+      const flat = masonry(realPhotos, width, density)
+      if (width >= 600) {
+        // Column layout caps panoramas at column width while flat rows scale
+        // them to full wall width; portraits already match flat density, so
+        // the honest parity floor for the average is 0.7.
+        const flatArea =
+          flat.tiles.reduce((sum, tile) => sum + tile.width * tile.height, 0) /
+          flat.tiles.length
+        const surroundArea =
+          tiles.reduce((sum, tile) => sum + tile.width * tile.height, 0) / tiles.length
+        assert.ok(
+          surroundArea / flatArea >= 0.7,
+          `surround/flat area ratio ${surroundArea / flatArea} at ${width}/${density}`,
+        )
+      } else {
+        const target = Math.min(
+          DEFAULT_JUSTIFY_OPTIONS[density].targetRowHeight,
+          width * DEFAULT_JUSTIFY_OPTIONS[density].mobileRowFactor,
+        )
+        const widest = Math.max(...tiles.map((tile) => tile.width))
+        assert.ok(
+          widest >= target * 0.9,
+          `mobile tile ${widest} vs flat target ${target} at ${width}/${density}`,
+        )
+      }
+    }
 })

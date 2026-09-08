@@ -22,8 +22,8 @@
 }
 .detail-backdrop {
   background: rgb(12 12 12 / 30%);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(var(--glass-scrim-blur));
+  backdrop-filter: blur(var(--glass-scrim-blur));
 }
 .detail-stage {
   position: relative;

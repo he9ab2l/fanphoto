@@ -27,10 +27,13 @@ export function columnCount(width: number, density: number) {
   if (width < 600) return density === 3 ? 3 : 2
   return Math.max(2, Math.min(9, Math.floor(width / ({ 1: 340, 2: 260, 3: 200 }[density] || 260))))
 }
+// Density parity with the flat wall: same gap schedule (10px regular /
+// 6px dense) and pure proportional sizing, so surround tiles pack as
+// tightly as flat rows without an extra area tax on portraits.
 const SURROUND_OPTIONS = {
-  areaFactor: 0.78,
-  gap: 14,
-  denseGap: 8,
+  areaFactor: 1,
+  gap: 10,
+  denseGap: 6,
   overscanColumns: 2,
   overscanHeight: 0.65,
 }
