@@ -4,7 +4,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@base-ui/react/dialog'
 import Gallery from './gallery/Gallery'
 import { EmptyState, Spinner, IconButton } from './ui/primitives'
-import { GlassSurface } from './vendor/GlassSurface'
+import { GlassSurface } from './glass/GlassSurface'
+import { startGlassLight } from './glass/GlassLight'
 import { setCsrf } from './lib/api'
 const PhotoDialog = lazy(() => import('./gallery/PhotoDialog'))
 const Studio = lazy(() => import('./studio/Studio'))
@@ -30,7 +31,7 @@ function PendingPhotoDialog() {
             正在打开照片
           </Dialog.Title>
           <Spinner label="打开照片详情" />
-          <GlassSurface className="photo-opening-close">
+          <GlassSurface material="thin" shape="capsule" interactive specular className="photo-opening-close">
             <Dialog.Close render={<IconButton icon="close" label="关闭照片详情" />} />
           </GlassSurface>
         </Dialog.Popup>
@@ -41,6 +42,7 @@ function PendingPhotoDialog() {
 export default function App() {
   const location = useLocation(),
     client = useQueryClient()
+  useEffect(() => startGlassLight(), [])
   const isPhoto = /^\/photo\/[^/]+$/.test(location.pathname)
   const [foregroundReady, setForegroundReady] = useState(false)
   const photoReady = useCallback(() => setForegroundReady(true), [])

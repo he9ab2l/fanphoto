@@ -12,9 +12,6 @@
   --ink: #202020;
   --muted: #5b5b5b;
   --line: rgb(0 0 0 / 10%);
-  --glass: rgb(250 250 250 / 86%);
-  --glass-border: rgb(255 255 255 / 68%);
-  --glass-highlight: rgb(255 255 255 / 80%);
   --hover: rgb(0 0 0 / 6%);
   --scrim: rgb(20 20 20 / 20%);
   --shadow: 0 8px 32px rgb(0 0 0 / 10%), 0 2px 10px rgb(0 0 0 / 5%);
@@ -38,9 +35,6 @@
   --ink: #f4f4f4;
   --muted: #b3b3b3;
   --line: rgb(255 255 255 / 12%);
-  --glass: rgb(29 29 29 / 87%);
-  --glass-border: rgb(255 255 255 / 15%);
-  --glass-highlight: rgb(255 255 255 / 18%);
   --hover: rgb(255 255 255 / 9%);
   --scrim: rgb(0 0 0 / 27%);
   --shadow: 0 8px 32px rgb(0 0 0 / 25%), 0 2px 10px rgb(0 0 0 / 12%);
@@ -158,25 +152,8 @@ button:disabled,
   color: var(--muted);
 }
 
-/* React Bits GlassSurface's cross-browser fallback, adapted to monochrome tokens.
-   Static blur + translucency + inner edge highlights; not Apple's native API. */
-.material,
-.glass-surface--fallback {
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  -webkit-backdrop-filter: blur(22px) saturate(1.1);
-  backdrop-filter: blur(22px) saturate(1.1);
-  box-shadow:
-    var(--shadow),
-    inset 0 1px 0 var(--glass-highlight);
-}
-.glass-surface {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-}
+/* Glass visuals live in styles/glass.css (Glass Engine); base.css keeps only
+   the layout chrome for the surface container. */
 .glass-surface__content {
   display: flex;
   align-items: center;
@@ -594,26 +571,11 @@ textarea::placeholder {
   font-family: inherit !important;
 }
 [data-sonner-toast] {
-  background: var(--glass) !important;
+  background: var(--glass-bg-strong) !important;
   color: var(--ink) !important;
   border-color: var(--line) !important;
   backdrop-filter: blur(20px);
   border-radius: 14px !important;
-}
-@supports not (backdrop-filter: blur(1px)) {
-  .material,
-  .glass-surface--fallback {
-    background: var(--surface);
-  }
-}
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .material,
-  .glass-surface--fallback {
-    background: var(--surface);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border-color: var(--muted);
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   *,

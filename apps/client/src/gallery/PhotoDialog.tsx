@@ -11,11 +11,14 @@ import { toast } from 'sonner'
 import type { PhotoDetail, PhotoPage, PhotoSummary } from '@fanphoto/contracts'
 import { api, RequestError, useSite } from '../lib/api'
 import { apiFilters } from '../lib/photos'
+import { usePreferences } from '../lib/preferences'
 import { imageAsset, imageQuality } from '../lib/image-loading'
 import { Button, ErrorState, IconButton, cn } from '../ui/primitives'
 import { DetailImage } from '../ui/PhotoImage'
 import { Icon } from '../ui/icons'
-import { GlassSurface } from '../vendor/GlassSurface'
+import { GlassSurface } from '../glass/GlassSurface'
+import { useGlassAmbient, blendGlassBg, tintFromPhoto } from '../glass/GlassEnvironment'
+import { MATERIALS } from '../glass/GlassMaterial'
 import { PhotoInfoBody, PhotoInfoHeader } from './PhotoInfo'
 import { VIEWER, viewerLayout, type InfoState, type Viewport } from './viewer-layout'
 
@@ -50,6 +53,7 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
   const site = useSite(),
     reduced = useReducedMotion(),
     viewport = useViewport()
+  const { resolvedTheme } = usePreferences()
   const mobile = viewport.width <= VIEWER.breakpoint
   const [open, setOpen] = useState(true)
   const [readyPhoto, setReadyPhoto] = useState('')
@@ -63,10 +67,11 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
   const [info, setInfo] = useState<InfoState>(() => (mobile ? 'collapsed' : 'full'))
   const shell = useRef<HTMLDivElement>(null),
     stage = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const closeButton = useRef<HTMLButtonElement>(null),
     infoButton = useRef<HTMLButtonElement>(null)
   const grip = useRef<HTMLButtonElement>(null),
-    desktopInfo = useRef<HTMLElement>(null)
+    desktopInfo = useRef<HTMLDivElement>(null)
   const desktopScroll = useRef<HTMLDivElement>(null),
     mobileScroll = useRef<HTMLDivElement>(null)
   const sheetPopup = useRef<HTMLDivElement>(null),
@@ -106,6 +111,21 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
   const forbidden = query.error instanceof RequestError && [403, 404].includes(query.error.status)
   const photo = forbidden ? undefined : query.data?.photo
   const summary = forbidden ? undefined : photo || cachedSummary
+  // The photo environment drives every auto glass surface while this dialog
+  // is open (dock behind the scrim, panel, sheet and controls all belong to it).
+  useGlassAmbient(summary, resolvedTheme)
+  const sheetBg = useMemo(
+    () =>
+      summary
+        ? blendGlassBg(
+            tintFromPhoto(summary.thumbHash, resolvedTheme),
+            resolvedTheme,
+            MATERIALS.thick[resolvedTheme].tint,
+            MATERIALS.thick[resolvedTheme].opacity,
+          )
+        : undefined,
+    [summary?.thumbHash, resolvedTheme],
+  )
   const layout = viewerLayout(viewport, summary ? summary.width / summary.height : 1.5, info)
   const expanded = info !== 'collapsed'
   const locked = mobile && expanded
@@ -136,6 +156,37 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
         imageQuality(),
       ).url
     : ''
+  // Hero WebGL lens: rebuild the photo region under the panel from the true
+  // DOM image (never a page screenshot) whenever photo/layout changes.
+  const webglPaintKey = summary
+    ? `${summary.id}:${info}:${layout.photo.x}:${layout.photo.y}:${layout.photo.width}:${layout.photo.height}`
+    : ''
+  const paintPanelBackdrop = useCallback(
+    (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+      const stageEl = stage.current
+      const panelEl = panelRef.current
+      if (!stageEl || !panelEl) return
+      const rootStyle = getComputedStyle(document.documentElement)
+      ctx.fillStyle = rootStyle.getPropertyValue('--canvas')
+      ctx.fillRect(0, 0, width, height)
+      ctx.fillStyle = 'rgb(12 12 12 / 0.3)'
+      ctx.fillRect(0, 0, width, height)
+      const image = stageEl.querySelector<HTMLImageElement>('.detail-image-full')
+      if (!image?.complete || !image.naturalWidth) return
+      const stageRect = stageEl.getBoundingClientRect()
+      const panelRect = panelEl.getBoundingClientRect()
+      ctx.drawImage(
+        image,
+        stageRect.left + layout.photo.x - panelRect.left,
+        stageRect.top + layout.photo.y - panelRect.top,
+        layout.photo.width,
+        layout.photo.height,
+      )
+    },
+    [layout.photo.x, layout.photo.y, layout.photo.width, layout.photo.height],
+  )
+  const webglOn =
+    !mobile && expanded && Boolean(summary) && readyPhoto === summary?.id
   const close = useCallback(() => {
     if (location.state?.background) navigate(-1)
     else navigate('/' + location.search, { replace: true })
@@ -362,7 +413,7 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
               style={{ top: layout.photo.y + layout.photo.height / 2 - VIEWER.navigationSize / 2 }}
               transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
             >
-              <GlassSurface>
+              <GlassSurface material="thin" shape="capsule" interactive specular>
                 <IconButton
                   icon="left"
                   label="上一张照片"
@@ -377,7 +428,7 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
               style={{ top: layout.photo.y + layout.photo.height / 2 - VIEWER.navigationSize / 2 }}
               transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
             >
-              <GlassSurface>
+              <GlassSurface material="thin" shape="capsule" interactive specular>
                 <IconButton
                   icon="right"
                   label="下一张照片"
@@ -387,14 +438,21 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
               </GlassSurface>
             </motion.div>
             {!mobile && !expanded && summary && (
-              <GlassSurface className="detail-float-actions">{actions}</GlassSurface>
+              <GlassSurface
+                material="thin"
+                shape="capsule"
+                specular
+                className="detail-float-actions"
+              >
+                {actions}
+              </GlassSurface>
             )}
           </div>
           {!mobile && (
-            <motion.aside
+            <motion.div
               ref={desktopInfo}
               id="photo-information"
-              className="detail-info"
+              className="detail-info-wrap"
               aria-label="照片信息"
               inert={!expanded}
               aria-hidden={!expanded}
@@ -402,12 +460,25 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
               animate={{ x: expanded ? 0 : VIEWER.infoWidth, opacity: expanded ? 1 : 0 }}
               transition={{ duration: reduced ? 0 : 0.18, ease: 'easeOut' }}
             >
-              <PhotoInfoHeader photo={summary} active={expanded} />
-              <div ref={desktopScroll} className="detail-info-scroll">
-                <PhotoInfoBody photo={photo}>{infoError}</PhotoInfoBody>
-              </div>
-              <footer className="detail-info-footer">{actions}</footer>
-            </motion.aside>
+              <GlassSurface
+                className="detail-info"
+                material="thick"
+                shape="large"
+                photo={summary}
+                rootRef={panelRef}
+                webgl={
+                  webglOn
+                    ? { enabled: true, paintKey: webglPaintKey, paintBackdrop: paintPanelBackdrop }
+                    : undefined
+                }
+              >
+                <PhotoInfoHeader photo={summary} active={expanded} />
+                <div ref={desktopScroll} className="detail-info-scroll">
+                  <PhotoInfoBody photo={photo}>{infoError}</PhotoInfoBody>
+                </div>
+                <footer className="detail-info-footer">{actions}</footer>
+              </GlassSurface>
+            </motion.div>
           )}
           {mobile && (
             <Drawer.Root
@@ -436,7 +507,7 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
               {!expanded && (
                 <div className="detail-sheet-entry-area">
                   <Drawer.SwipeArea className="detail-sheet-swipe-area" />
-                  <GlassSurface>
+                  <GlassSurface material="thin" shape="capsule" interactive specular>
                     <Drawer.Trigger
                       render={<Button ref={infoButton} className="detail-sheet-entry" />}
                     >
@@ -460,7 +531,7 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
                     data-info-state={info}
                     initialFocus={grip}
                     finalFocus={() => infoButton.current || closeButton.current || false}
-                    style={{ height: layout.sheet.full }}
+                    style={{ height: layout.sheet.full, '--glass-bg': sheetBg } as CSSProperties}
                   >
                     <Drawer.Title className="sr-only" render={<span />}>
                       照片信息
@@ -515,7 +586,7 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
                           } as CSSProperties
                         }
                       >
-                        <GlassSurface>
+                        <GlassSurface material="thin" shape="capsule" interactive specular>
                           <IconButton
                             icon="close"
                             label="关闭照片详情"
@@ -533,7 +604,7 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
             </Drawer.Root>
           )}
           {!locked && (
-            <GlassSurface className="detail-corner">
+            <GlassSurface material="thin" shape="capsule" interactive specular className="detail-corner">
               {!mobile && (
                 <IconButton
                   ref={infoButton}

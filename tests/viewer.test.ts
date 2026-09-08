@@ -7,7 +7,7 @@ import {
   type InfoState,
 } from '../apps/client/src/gallery/viewer-layout'
 import { imageAsset, retryImageUrl } from '../apps/client/src/lib/image-loading'
-import { glassDisplacementPixels, withinGlassBudget } from '../apps/client/src/ui/glass-map'
+import { lensField, withinLensBudget } from '../apps/client/src/glass/displacement/lens-field'
 import type { PhotoSummary } from '../packages/contracts/src'
 
 test('viewer preserves every photo ratio and reserves independent mobile sheet space', () => {
@@ -87,14 +87,27 @@ test('only an explicit retry changes an image URL', () => {
   assert.equal(retryImageUrl('/media/lg', 1), '/media/lg?retry=1')
 })
 
-test('liquid glass map is deterministic, neutral in the center, and limited to small surfaces', () => {
-  const map = glassDisplacementPixels(300, 56, 28)
-  assert.deepEqual(map, glassDisplacementPixels(300, 56, 28))
-  const center = (28 * 300 + 150) * 4
-  assert.equal(map.pixels[center], 128)
-  assert.equal(map.pixels[center + 1], 128)
-  assert.ok(withinGlassBudget(400, 60))
-  assert.equal(withinGlassBudget(1440, 900), false)
-  assert.equal(withinGlassBudget(320, 640), false)
-  assert.equal(withinGlassBudget(0, 0), false)
+test('lens field is deterministic, refracts slightly at the center and stronger at rims, and is budgeted', () => {
+  const map = lensField(300, 56, 28)
+  assert.deepEqual(map, lensField(300, 56, 28))
+  const centerIndex = (28 * 300 + 150) * 4
+  const centerR = map.pixels[centerIndex]
+  const centerG = map.pixels[centerIndex + 1]
+  // Center stays a weak, nearly neutral lens (the pane refracts even at its
+  // middle — per spec — but never hard). Rim bending must be clearly stronger.
+  assert.ok(Math.abs(centerR - 128) <= 40, `center R ${centerR}`)
+  assert.ok(Math.abs(centerG - 128) <= 40, `center G ${centerG}`)
+  // Rim pixels refract much more than the center (the pane bends vertically
+  // at top/bottom edges, so evaluate both displacement channels).
+  const rimIndex = (1 * 300 + 150) * 4
+  const centerStrength = Math.max(Math.abs(centerR - 128), Math.abs(centerG - 128))
+  const rimStrength = Math.max(
+    Math.abs(map.pixels[rimIndex] - 128),
+    Math.abs(map.pixels[rimIndex + 1] - 128),
+  )
+  assert.ok(rimStrength > centerStrength, `rim ${rimStrength} vs center ${centerStrength}`)
+  assert.ok(withinLensBudget(400, 60))
+  assert.equal(withinLensBudget(1440, 900), false)
+  assert.equal(withinLensBudget(320, 640), false)
+  assert.equal(withinLensBudget(0, 0), false)
 })
