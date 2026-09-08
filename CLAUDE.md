@@ -10,7 +10,7 @@
 
 ## 代码与拓扑
 ```
-~/fanphoto（本机 Termux = 开发环境，git 仓库 github.com/he9ab2l/fanphoto，当前 feat/photo-detail-viewer）
+~/fanphoto（本机 Termux = 开发环境，git 仓库 github.com/he9ab2l/fanphoto，当前 main，功能分支合并后删除）
 ├─ apps/client    React 19 + Vite + TS：gallery(平铺 / 环绕) / studio(管理) / ui(token)
 ├─ apps/server    Node 24 + Hono：core(配置/SQLite/存储/安全) + modules(认证/媒体/图库/相册)
 ├─ packages/contracts   Zod 请求契约（唯一 API 事实来源，docs/api.md）
@@ -75,6 +75,7 @@ svc: systemctl {start|stop|restart|status} fanphoto.service
 | 2026-09-08 | 基于当前分支对照 main，完成修改、自测、回归修复、更新和收尾；自主判断，不等确认，不擅改 main、不影响照片数据或其他服务 | ✅ 已实现、验证并部署 |
 | 2026-09-08 | 前后端一起优化，网站加载速度优先；首屏按需加载、主图优先、静态 Brotli/gzip、API 压缩与轻量数据库查询，权限边界不变 | ✅ 已实现、验证并部署  |
 | 2026-09-08 | 以写代码和交付为主，只做必要的类型/构建、关键回归与浏览器检查，不扩展耗时测试环境 | 本轮执行约束 |
+| 2026-09-08 | `feat/photo-detail-viewer` 快进合并入 main 并删除分支，收尾本轮开发 | ✅ 已完成（c31e7f6 = main） |
 
 ## 用户偏好
 - **需求及时记录（永久规则）**：每确认一条需求/决策立即追加到上方「需求记录」表并提交；以后每次开发默认遵守。
