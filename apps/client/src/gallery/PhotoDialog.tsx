@@ -453,6 +453,7 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
               ref={desktopInfo}
               id="photo-information"
               className="detail-info-wrap"
+              role="complementary"
               aria-label="照片信息"
               inert={!expanded}
               aria-hidden={!expanded}

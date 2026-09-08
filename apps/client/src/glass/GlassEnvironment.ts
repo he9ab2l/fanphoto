@@ -88,10 +88,15 @@ export function setGlassAmbient(thumbHash: string | null, theme: GlassTheme) {
   window.dispatchEvent(new CustomEvent(AMBIENT_EVENT))
 }
 
-/** Publish the ambient for a photo (effect-driven; used by dialogs/gallery). */
+/** Publish the ambient for a photo (effect-driven; used by dialogs/gallery).
+ * Resets to neutral when the photo context unmounts so gallery glass does not
+ * stay tinted by a closed viewer. */
 export function useGlassAmbient(photo: PhotoSummary | null | undefined, theme: GlassTheme) {
   useEffect(() => {
     setGlassAmbient(photo?.thumbHash ?? null, theme)
+    return () => {
+      setGlassAmbient(null, theme)
+    }
   }, [photo?.thumbHash, theme])
 }
 
