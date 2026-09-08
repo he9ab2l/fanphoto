@@ -2,7 +2,7 @@
 
 ## 2026-09-08：详情、两种照片墙与加载优化
 
-- 测试站：`https://test.heabl.xyz`；当前不可变发布：`release.xG3VoR`。
+- 测试站：`https://test.heabl.xyz`；本轮验收时不可变发布：`release.xG3VoR`（后续发布为 `release.QLYqBJ`）。
 - 分支：`feat/photo-detail-viewer`，对照 main 修复，未合并或改写 main。
 - 需求依据（`~/问题清单.txt`、项目根 `FanPhoto 照片详情页 UI 改动.md`）已全部实现，两份需求文档应要求于 2026-09-08 清理删除。
 - 服务器类型检查、生产构建及 **44 项回归全部通过**，涵盖 API/媒体/权限/迁移/缓存/压缩/图库/查看器几何。
