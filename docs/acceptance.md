@@ -1,5 +1,19 @@
 # 验收记录
 
+## 2026-09-08：Glass Engine 前端重构
+
+- 测试站：`https://test.heabl.xyz`；本轮不可变发布：`release.Om8mnP`（current 已切换）。
+- 分支：`feat/glass-engine`（未合并 main）。
+- 需求依据：`FanPhoto 项目前端重构.md`（已下载至本机 `~/FanPhoto 项目前端重构.md`），按提示词先输出《FanPhoto Glass Engine Architecture》（docs/glass-engine-architecture.md）后实施。
+- 服务器构建与 **44 项回归全部通过**（API/媒体/权限/迁移/缓存/压缩/图库/查看器几何 + 更新的透镜字段测试：确定性、中心轻微折射、边缘增强、面积预算）。
+- `tools/verify-live.mjs` 域名级验收通过：health/安全头/70 张/280 变体可访问/会话与 CSRF/原片上传往返/可见性撤回/临时数据清理。
+- 实施要点：
+  - `apps/client/src/glass/` 新增统一引擎：`GlassSurface`（唯一 React 入口，material/shape/tint/interactive/refractive/specular/webgl）、`GlassMaterial`（ultraThin→ultraThick 五档 × opacity/blur/saturation/brightness/tint/shadow/rim/refraction）、`GlassEnvironment`（thumbHashToAverageRGBA→OKLCH 克制着色，亮/暗/夜景/高饱和自适应，document 级 `--glass-ambient`）、`GlassLight`（pointer/viewport/scroll → `--glass-light-x/y/intensity`，rAF 合帧）、`GlassMotion`（motion/react 弹簧：hover 吸附/pointer 变形/press 压缩/release 弹性，stiffness 320/damping 24）、`displacement/{sdf,lens-field,cache}`（SDF rounded box 高度场，中心 0.35 + 边缘 1.15 折射，IOR≈1.3–1.5 观感）、`renderers/SVGGlassRenderer`（feImage+feDisplacementMap+feGaussianBlur+feColorMatrix+lighting composite+边缘 RGB 色散 R+1/G0/B−1）、`renderers/WebGLGlassRenderer`（SDF 透镜/法线/折射/色差/Fresnel/specular/blur，DPR≤1.5，render-on-change，contextlost 降级）。
+  - PhotoDialog：桌面详情面板改为悬浮玻璃（material=thick，照片环境色 tint，WebGL hero 透镜用真实 DOM 图片按布局几何重建面板下方背景，不整页截图）；移动抽屉为 token 玻璃并带照片 tint；nav/corner/浮层均为 thin+interactive。
+  - 全站单玻璃样式层 `styles/glass.css`；删除 `materials.css`、`ui/glass-map.ts`、`vendor/GlassSurface.tsx` 与 base.css 内重复玻璃 CSS；圆角收敛为 small/medium/large/capsule 连续系统。
+  - 性能：motion 与 WebGL renderer 拆为懒加载 chunk（`manualChunks`），入口 index chunk 约 492KB→270KB（gzip 约 162KB→92KB），react-vendor/motion 独立缓存；玻璃面仍限 60k px 透镜预算。
+- 未做浏览器视觉截图验收（本轮用户指示不做截图验证；上一轮约定“不在 ten 跑软件栅格化浏览器”，本轮用户指示改在 ten 测试但明确不需要截图）。
+
 ## 2026-09-08：详情、两种照片墙与加载优化
 
 - 测试站：`https://test.heabl.xyz`；本轮验收时不可变发布：`release.xG3VoR`（后续发布为 `release.QLYqBJ`）。

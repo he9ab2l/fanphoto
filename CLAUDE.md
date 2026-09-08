@@ -74,6 +74,7 @@ svc: systemctl {start|stop|restart|status} fanphoto.service
 | 2026-09-08 | 复用 Base UI/MingCute/Motion 和设计、玻璃、无障碍、性能 skills；图标语义对应，液态折射和毛玻璃分层、可降级 | ✅ 已实现、验证并部署 |
 | 2026-09-08 | 基于当前分支对照 main，完成修改、自测、回归修复、更新和收尾；自主判断，不等确认，不擅改 main、不影响照片数据或其他服务 | ✅ 已实现、验证并部署 |
 | 2026-09-08 | 前后端一起优化，网站加载速度优先；首屏按需加载、主图优先、静态 Brotli/gzip、API 压缩与轻量数据库查询，权限边界不变 | ✅ 已实现、验证并部署  |
+| 2026-09-08 | **FanPhoto Glass Engine 重构**：按《FanPhoto 项目前端重构.md》将全站玻璃升级为 Apple Photos + iOS 26 Liquid Glass 风格——统一 src/glass/ 引擎（GlassSurface 唯一入口 + 5 档材质 GlassMaterial + 环境采样 thumbhash→OKLCH 克制着色 + 动态光源 pointer→CSS 变量 + motion/react 弹簧交互 + SDF 透镜位移场 + SVG 折射渲染器含边缘 RGB 色散与光照合成 + WebGL hero 透镜自动降级 SVG）；PhotoDialog 桌面详情面板成为悬浮玻璃（照片环境色 + WebGL 重建背景折射）；连续圆角系统；全站单玻璃样式层 glass.css（删除 materials.css/glass-map/旧 vendor GlassSurface）；motion 与 WebGL renderer 拆为懒加载 chunk，入口 chunk 492KB→270KB；测试站部署 release.Om8mnP，44 项回归 + verify-live 全过 | ✅ 已实现、验证并部署 |
 | 2026-09-08 | 以写代码和交付为主，只做必要的类型/构建、关键回归与浏览器检查，不扩展耗时测试环境 | 本轮执行约束 |
 | 2026-09-08 | `feat/photo-detail-viewer` 快进合并入 main 并删除分支，收尾本轮开发 | ✅ 已完成（c31e7f6 = main） |
 | 2026-09-08 | 清理中间产物：弃用提示词（前端优化.md、图片详情页重构任务提示词）、临时输出（all_skills/claude_p_out/e/o）、验收截图 artifacts/，及需求原文（UI 改动.md、重构要求.md、问题清单.txt，已全部实现后应要求删除）；ten backups/ 已空无垃圾备份可清理 | ✅ 已完成 |
