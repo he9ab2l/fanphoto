@@ -16,11 +16,11 @@
 ~/fanphoto（本机 Termux = 开发环境，git 仓库 github.com/he9ab2l/fanphoto，当前 main，功能分支合并后删除）
 ├─ apps/client    React 19 + Vite + TS：gallery(平铺 / 环绕) / studio(管理) / ui(token)
 ├─ apps/server    Node 24 + Hono：core(配置/SQLite/存储/安全) + modules(认证/媒体/图库/相册)
-├─ packages/contracts   Zod 请求契约（唯一 API 事实来源，docs/api.md）
+├─ packages/contracts   Zod 请求契约（唯一 API 事实来源，docs/API.md）
 ├─ scripts         dev/import/setup/build/backup
 ├─ deploy          release.sh(不可变发布) / caddy-config.mjs / fanphoto.service
 ├─ tests           node:test 单元（API/媒体/几何/部署）
-└─ tools           download-landscapes / audit-photos / verify-live / capture-ui 等
+└─ tools           download-landscapes / audit-photos / verify-live / verify-browser / license-notices / write-photo-sources
 ten:/home/ubuntu/fanphoto-next/  服务器部署（非 git，rsync 同步 workspace）
    ├─ workspace/   最新源码（与本地保持一致）
    ├─ releases/    release.*（current → 最新，不可变）

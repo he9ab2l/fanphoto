@@ -1,9 +1,23 @@
 # 验收记录
 
+## 2026-09-09：生产级重构与发布准备（refactor/production-ready）
+
+- 分支：`refactor/production-ready`（基于 main，全部改动在此分支）。
+- 已做：环绕模式与平铺视觉密度对齐（同一 gap 体系 + 纯比例缩放 + 密度回归测试）；玻璃
+  scrim/toast 统一到 glass token；zod 3.25 → 4.5；清理 REFACTOR_LOG 与一次性 demo/截图工具；
+  README / docs/API.md / docs/ARCHITECTURE.md / .env.example 对齐实际代码。
+- 验证见 `RELEASE_NOTES.md` 与主线提交历史。
+
+## 2026-09-09：液态玻璃六缺陷修复（release.cBYkTK）
+
+- 修复 SVG 色散丢蓝通道、WebGL 边缘因子/rim 反转、透镜场内部接缝、光系统无限 rAF、
+  高光 setState 风暴、WebGL 探测误加载；折射预算提升至 1024×900/280k px。
+- 已合并 main 并切换 `current`；44 项回归 + verify-live 域名验收通过。
+
 ## 2026-09-08：Glass Engine 前端重构
 
 - 测试站：`https://test.heabl.xyz`；本轮不可变发布：`release.Om8mnP`（current 已切换）。
-- 分支：`feat/glass-engine`（未合并 main）。
+- 分支：`feat/glass-engine`（当年未合并 main，后已合并）。
 - 需求依据：`FanPhoto 项目前端重构.md`（已下载至本机 `~/FanPhoto 项目前端重构.md`），按提示词先输出《FanPhoto Glass Engine Architecture》（docs/glass-engine-architecture.md）后实施。
 - 服务器构建与 **44 项回归全部通过**（API/媒体/权限/迁移/缓存/压缩/图库/查看器几何 + 更新的透镜字段测试：确定性、中心轻微折射、边缘增强、面积预算）。
 - `tools/verify-live.mjs` 域名级验收通过：health/安全头/70 张/280 变体可访问/会话与 CSRF/原片上传往返/可见性撤回/临时数据清理。
