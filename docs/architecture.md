@@ -34,7 +34,7 @@ Caddy HTTPS → Hono HTTP 装配
 - TanStack Query 管理服务端数据、取消旧查询、游标与更新失效；界面偏好独立存于 localStorage。
 - studio、详情动画、元数据样式、筛选表单、显示设置、通知按需加载；首屏不提前下载这些交互代码。
 - Base UI 负责按钮、弹层、选择、开关、滑块、复选框与焦点；不手写焦点陷阱。
-- React Bits Masonry / DomeGallery / GlassSurface 的适配见 `ui-resources.md` 和 `vendor/NOTICE.md`。
+- React Bits Masonry / DomeGallery 的适配见 `vendor/NOTICE.md`；全站玻璃为自研 Glass Engine（`src/glass/`，见 `docs/glass-engine-architecture.md`），不再依赖 react-bits 玻璃组件。
 - MingCute 是唯一图标体系；不请求远程图标 CDN，不手画图标。
 - 所有公开与管理页面共享黑白灰 token、系统字体、安全区、明 / 暗 / 系统主题和交互反馈。
 

@@ -63,8 +63,6 @@ pnpm start
 - [架构与扩展设计](docs/architecture.md)
 - [API 契约](docs/api.md)
 - [开发、部署与恢复](docs/operations.md)
-- [本地组件 / 图标 / skill 审查](docs/ui-resources.md)
-- [实施计划与验收范围](docs/plan.md)
 - [验收结果](docs/acceptance.md)
 
 当前以 2.0 新架构为准，不提供旧 API、旧 UI 或旧数据库兼容层。

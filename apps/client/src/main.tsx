@@ -7,7 +7,7 @@ import { RequestError } from './lib/api'
 import { PreferencesProvider } from './lib/preferences'
 import { UploadProvider } from './studio/UploadQueue'
 import './styles/base.css'
-import './styles/materials.css'
+import './styles/glass.css'
 import './styles/gallery.css'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

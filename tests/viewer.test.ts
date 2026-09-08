@@ -7,7 +7,7 @@ import {
   type InfoState,
 } from '../apps/client/src/gallery/viewer-layout'
 import { imageAsset, retryImageUrl } from '../apps/client/src/lib/image-loading'
-import { glassDisplacementPixels, withinGlassBudget } from '../apps/client/src/ui/glass-map'
+import { lensField, withinLensBudget } from '../apps/client/src/glass/displacement/lens-field'
 import type { PhotoSummary } from '../packages/contracts/src'
 
 test('viewer preserves every photo ratio and reserves independent mobile sheet space', () => {
@@ -87,14 +87,32 @@ test('only an explicit retry changes an image URL', () => {
   assert.equal(retryImageUrl('/media/lg', 1), '/media/lg?retry=1')
 })
 
-test('liquid glass map is deterministic, neutral in the center, and limited to small surfaces', () => {
-  const map = glassDisplacementPixels(300, 56, 28)
-  assert.deepEqual(map, glassDisplacementPixels(300, 56, 28))
-  const center = (28 * 300 + 150) * 4
-  assert.equal(map.pixels[center], 128)
-  assert.equal(map.pixels[center + 1], 128)
-  assert.ok(withinGlassBudget(400, 60))
-  assert.equal(withinGlassBudget(1440, 900), false)
-  assert.equal(withinGlassBudget(320, 640), false)
-  assert.equal(withinGlassBudget(0, 0), false)
+test('lens field is deterministic, keeps the interior flat and bends light only in the rim band, and is budgeted', () => {
+  const map = lensField(300, 56, 28)
+  assert.deepEqual(map, lensField(300, 56, 28))
+  const centerIndex = (28 * 300 + 150) * 4
+  const centerR = map.pixels[centerIndex]
+  const centerG = map.pixels[centerIndex + 1]
+  // The interior of a pane is flat glass: perfectly neutral displacement, no
+  // rim height. (A whole-pane field would flip its normal across the pane
+  // midline and draw a visible seam — the bug this guards against.)
+  assert.equal(centerR, 128, `center R ${centerR}`)
+  assert.equal(centerG, 128, `center G ${centerG}`)
+  assert.equal(map.pixels[centerIndex + 3], 0)
+  // Rim pixels bend light toward the pane center (top edge → +G) and carry
+  // rim height in alpha for the lighting consumers.
+  const rimIndex = (1 * 300 + 150) * 4
+  assert.ok(map.pixels[rimIndex + 1] - 128 > 20, 'top rim bends downward (inward)')
+  assert.ok(map.pixels[rimIndex + 3] > 200, 'rim carries height')
+  // Displacement must be continuous: no jump across the pane midline.
+  const midLeft = (28 * 300 + 60) * 4
+  const midRight = (28 * 300 + 240) * 4
+  assert.equal(map.pixels[midLeft], 128)
+  assert.equal(map.pixels[midRight], 128)
+  assert.ok(withinLensBudget(400, 60))
+  assert.ok(withinLensBudget(380, 680), 'detail panel fits the liquid budget')
+  assert.ok(withinLensBudget(320, 640), 'mobile sheet fits the liquid budget')
+  assert.equal(withinLensBudget(500, 700), false, 'surfaces past the pixel budget stay frosted')
+  assert.equal(withinLensBudget(1440, 900), false)
+  assert.equal(withinLensBudget(0, 0), false)
 })

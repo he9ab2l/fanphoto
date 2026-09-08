@@ -47,7 +47,7 @@ pnpm photos:import --directory test-photo/commons-landscapes
 pnpm typecheck
 pnpm test
 pnpm build
-# UI 验收：人工在测试站核对（浏览器自动化已移除，见 CLAUDE.md）
+# UI 验收：人工在测试站核对；必要浏览器检查见 CLAUDE.md（仅连接已启动的开发机浏览器）
 ```
 
 不能用 `pnpm import` 代替 `photos:import`，前者是 pnpm 自己的锁文件命令。
