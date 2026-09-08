@@ -15,9 +15,8 @@
 - 备份 `2026-09-08T00-23-05-198Z` 已核对：70 照片、350 资源、70 媒体目录。按既定策略仅保留这份最新完整备份；上一份冗余备份已删除。
 - 开发机浏览器、预览服务和临时 ADB 已停止；约 927 MB 的临时浏览器环境移入本机回收站，可恢复。没有在 ten 启动浏览器。
 
-截图与机器报告在 `artifacts/viewer/`：`desktop.png`、`phone.png`、`phone-full.png`、
-`surround.png`、`browser-report.json`、`mobile-report.json`。这些是浏览器布局/交互检查，
-不宣称完成了 Safari、Firefox、iOS 真机的人工视觉验收。
+浏览器布局/交互检查原本的截图与机器报告（`artifacts/viewer/`）已于 2026-09-08 清理归档，
+证据要点见上文；不宣称完成了 Safari、Firefox、iOS 真机的人工视觉验收。
 
 ## 2026-09-07：历史验收
 

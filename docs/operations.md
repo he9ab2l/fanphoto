@@ -64,7 +64,7 @@ FANPHOTO_UI_ORIGIN=http://127.0.0.1:4173 pnpm test:ui
 
 该必要浏览器检查仅连接已经启动的开发机浏览器，不自动启动服务器浏览器，不进行管理写操作。
 公开测试图片可通过 `FANPHOTO_READONLY_ORIGIN=https://test.heabl.xyz` 启动 Vite preview；
-此模式禁止代理写方法并剥离登录凭据。截图与报告在 `artifacts/viewer/`。
+此模式禁止代理写方法并剥离登录凭据。本地验收截图与报告（`artifacts/viewer/`）已归档清理。
 
 ## ten 清理与发布
 
