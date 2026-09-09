@@ -36,7 +36,7 @@ sudo -n systemctl daemon-reload
 sudo -n systemctl enable fanphoto.service
 sudo -n systemctl restart fanphoto.service
 for fanphoto_attempt in 1 2 3 4 5 6 7 8 9 10; do
-  if curl -fsS --max-time 3 http://127.0.0.1:8787/api/v1/health >/dev/null &&
+  if curl -fsS --max-time 3 http://127.0.0.1:8787/api/health >/dev/null &&
     curl -fsS --max-time 3 http://127.0.0.1:8787/ >/dev/null; then
     printf 'New release is healthy: %s\n' "$fanphoto_release"
     exit 0

@@ -5,7 +5,7 @@ export function replaceFanPhoto(text) {
   const lines = text.split('\n')
   const matchers = lines
     .map((line, index) => ({ line, index }))
-    .filter(({ line }) => /^\s*@fanphoto(?:_v2)?\s+host\s+test\.heabl\.xyz\s*$/.test(line))
+    .filter(({ line }) => /^\s*@fanphoto\s+host\s+test\.heabl\.xyz\s*$/.test(line))
   if (matchers.length !== 1) throw new Error('Expected exactly one FanPhoto host matcher')
   const start = matchers[0].index
   const matcher = matchers[0].line.trim().split(/\s/)[0]
@@ -22,8 +22,8 @@ export function replaceFanPhoto(text) {
   if (end >= lines.length) throw new Error('Unbalanced Caddy block')
   const beforeOutside = [...lines.slice(0, start), ...lines.slice(end + 1)].join('\n')
   const block = [
-    '\t@fanphoto_v2 host test.heabl.xyz',
-    '\thandle @fanphoto_v2 {',
+    '\t@fanphoto host test.heabl.xyz',
+    '\thandle @fanphoto {',
     '\t\tencode zstd gzip',
     '\t\trequest_body {',
     '\t\t\tmax_size 64MB',

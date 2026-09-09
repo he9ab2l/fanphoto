@@ -19,7 +19,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   if (options.body && !(options.body instanceof FormData))
     headers.set('Content-Type', 'application/json')
   if (options.method && !['GET', 'HEAD'].includes(options.method)) headers.set('X-CSRF-Token', csrf)
-  const response = await fetch('/api/v1' + path, {
+  const response = await fetch('/api' + path, {
     ...options,
     headers,
     credentials: 'same-origin',

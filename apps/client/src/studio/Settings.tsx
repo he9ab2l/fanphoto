@@ -107,7 +107,7 @@ function SettingsForm({ initial }: { initial: SiteSettings }) {
         <section className="settings-section surface">
           <h2>图库资料</h2>
           <p>导出元数据、相册与文件清单。完整备份请在服务器运行备份命令。</p>
-          <a className="button button--outline" href="/api/v1/admin/export">
+          <a className="button button--outline" href="/api/admin/export">
             <Icon name="export" size={18} />
             导出元数据
           </a>

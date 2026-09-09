@@ -1,6 +1,5 @@
 import { z } from 'zod'
 
-export const API_VERSION = 1
 export const MAX_SOURCE_BYTES = 50 * 1024 * 1024
 export const MAX_UPLOAD_BYTES = 52 * 1024 * 1024
 export const MAX_IMAGE_PIXELS = 80_000_000

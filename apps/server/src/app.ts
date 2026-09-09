@@ -41,7 +41,7 @@ export function createApp(services: Services) {
   })
   app.use('/api/*', async (c, next) =>
     bodyLimit({
-      maxSize: c.req.path === '/api/v1/admin/uploads' ? MAX_UPLOAD_BYTES : 256 * 1024,
+      maxSize: c.req.path === '/api/admin/uploads' ? MAX_UPLOAD_BYTES : 256 * 1024,
       onError: (context) =>
         context.json({ error: { code: 'BODY_LIMIT', message: '上传内容超出大小限制' } }, 413),
     })(c, next),
@@ -51,7 +51,7 @@ export function createApp(services: Services) {
   api.use('*', compress({ threshold: 1024, contentTypeFilter: /^application\/json/ }))
   api.get('/health', (c) => {
     db.get('SELECT 1')
-    return c.json({ ok: true, version: '2.0.0', apiVersion: 1, storage: 'sqlite-files' })
+    return c.json({ ok: true, version: '1.0.0', storage: 'sqlite-files' })
   })
   api.get('/site', (c) => c.json(settings.publicInfo()))
   api.get('/photos', (c) => c.json(photos.list(c.req.query(), false)))
@@ -195,7 +195,7 @@ export function createApp(services: Services) {
       },
     })
   })
-  app.route('/api/v1', api)
+  app.route('/api', api)
   app.get('/media/photos/:id/:variant', async (c) => {
     const admin = !!auth.current(c)
     const id = idSchema.parse(c.req.param('id'))

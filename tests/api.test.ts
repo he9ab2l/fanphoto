@@ -58,7 +58,7 @@ test('security headers survive standalone HTML, media and download responses', a
     }
     await h.login()
     const photo = (await h.upload(await fixture(420, 310))).photo
-    for (const path of [photo.assets.sm.url, `/api/v1/photos/${photo.id}/download`]) {
+    for (const path of [photo.assets.sm.url, `/api/photos/${photo.id}/download`]) {
       const response = await h.request(path)
       assert.equal(response.status, 200)
       assert.equal(response.headers.get('x-content-type-options'), 'nosniff')
@@ -70,17 +70,15 @@ test('security headers survive standalone HTML, media and download responses', a
   }
 })
 
-test('fresh v1 contract, no old API compatibility or anonymous admin access', async () => {
+test('health and public endpoints respond; anonymous admin access is denied', async () => {
   const h = await harness()
   try {
-    assert.equal((await h.request('/api/health')).status, 404)
-    assert.equal((await h.request('/api/photos')).status, 404)
-    assert.equal((await h.request('/api/v1/health')).status, 200)
-    assert.equal((await h.request('/api/v1/admin/photos')).status, 401)
-    const publicSite = await (await h.request('/api/v1/site')).json()
+    assert.equal((await h.request('/api/health')).status, 200)
+    assert.equal((await h.request('/api/admin/photos')).status, 401)
+    const publicSite = await (await h.request('/api/site')).json()
     assert.equal(publicSite.counts.photos, 0)
     assert.equal(publicSite.site.keepOriginals, undefined)
-    assert.equal((await (await h.request('/api/v1/session')).json()).authenticated, false)
+    assert.equal((await (await h.request('/api/session')).json()).authenticated, false)
   } finally {
     await h.close()
   }
@@ -92,10 +90,10 @@ test('secure session, CSRF, foreign origins, logout and persisted login rate lim
     assert.equal(login.status, 200)
     assert.match(login.headers.get('set-cookie')!, /HttpOnly/)
     assert.match(login.headers.get('set-cookie')!, /Secure/)
-    assert.match(login.headers.get('set-cookie')!, /__Host-fanphoto-v2=/)
+    assert.match(login.headers.get('set-cookie')!, /__Host-fanphoto=/)
     assert.equal(
       (
-        await h.request('/api/v1/admin/albums', 'POST', { title: 'Album' }, true, {
+        await h.request('/api/admin/albums', 'POST', { title: 'Album' }, true, {
           'x-csrf-token': '',
         })
       ).status,
@@ -103,21 +101,21 @@ test('secure session, CSRF, foreign origins, logout and persisted login rate lim
     )
     assert.equal(
       (
-        await h.request('/api/v1/admin/albums', 'POST', { title: 'Album' }, true, {
+        await h.request('/api/admin/albums', 'POST', { title: 'Album' }, true, {
           origin: 'https://other.test',
         })
       ).status,
       403,
     )
-    assert.equal((await h.request('/api/v1/session', 'DELETE')).status, 200)
-    assert.equal((await h.request('/api/v1/admin/stats')).status, 401)
+    assert.equal((await h.request('/api/session', 'DELETE')).status, 200)
+    assert.equal((await h.request('/api/admin/stats')).status, 401)
     for (let i = 0; i < 8; i++)
       assert.equal(
-        (await h.request('/api/v1/session', 'POST', { password: 'incorrect' }, false)).status,
+        (await h.request('/api/session', 'POST', { password: 'incorrect' }, false)).status,
         401,
       )
     assert.equal(
-      (await h.request('/api/v1/session', 'POST', { password: testPassword }, false)).status,
+      (await h.request('/api/session', 'POST', { password: testPassword }, false)).status,
       429,
     )
   } finally {
@@ -146,10 +144,10 @@ test('raw server import retains >2048px original, real EXIF, multiple sizes and 
     assert.equal(photo.assets.sm.width, 400)
     assert.equal(photo.assets.md.width, 800)
     assert.equal(photo.assets.lg.width, 1600)
-    const raw = await h.request(`/api/v1/admin/photos/${photo.id}/source`)
+    const raw = await h.request(`/api/admin/photos/${photo.id}/source`)
     assert.equal(sha256(new Uint8Array(await raw.arrayBuffer())), sha256(bytes))
     assert.equal(
-      (await h.request(`/api/v1/admin/photos/${photo.id}/source`, 'GET', undefined, false)).status,
+      (await h.request(`/api/admin/photos/${photo.id}/source`, 'GET', undefined, false)).status,
       401,
     )
     assert.equal(
@@ -157,7 +155,7 @@ test('raw server import retains >2048px original, real EXIF, multiple sizes and 
       404,
     )
     const publicPhoto = (
-      await (await h.request(`/api/v1/photos/${photo.id}`, 'GET', undefined, false)).json()
+      await (await h.request(`/api/photos/${photo.id}`, 'GET', undefined, false)).json()
     ).photo
     assert.equal(publicPhoto.file.name, null)
     assert.equal(publicPhoto.file.originalAvailable, false)
@@ -180,13 +178,13 @@ test('content deduplication, concurrent retries and client-key conflicts', async
     await h.upload(bytes, { clientId: anotherClient })
     const different = await fixture(501, 300)
     assert.equal(
-      (await h.request('/api/v1/admin/uploads', 'POST', h.form(different, { clientId }))).status,
+      (await h.request('/api/admin/uploads', 'POST', h.form(different, { clientId }))).status,
       409,
     )
     assert.equal(
       (
         await h.request(
-          '/api/v1/admin/uploads',
+          '/api/admin/uploads',
           'POST',
           h.form(different, { clientId: anotherClient }),
         )
@@ -207,8 +205,8 @@ test('stable pagination, search escaping, orientation, filters and context-aware
     await h.upload(await fixture(600, 1000), { title: 'Forest' })
     await h.upload(await fixture(700, 700), { title: 'Square' })
     await h.upload(await fixture(2400, 500), { title: 'Panorama' })
-    const first = await (await h.request('/api/v1/photos?limit=2')).json()
-    const compressed = await h.request('/api/v1/photos?limit=2', 'GET', undefined, false, {
+    const first = await (await h.request('/api/photos?limit=2')).json()
+    const compressed = await h.request('/api/photos?limit=2', 'GET', undefined, false, {
       'accept-encoding': 'gzip',
     })
     assert.equal(compressed.headers.get('content-encoding'), 'gzip')
@@ -218,28 +216,28 @@ test('stable pagination, search escaping, orientation, filters and context-aware
       first.items,
     )
     const second = await (
-      await h.request(`/api/v1/photos?limit=2&cursor=${first.page.nextCursor}`)
+      await h.request(`/api/photos?limit=2&cursor=${first.page.nextCursor}`)
     ).json()
     assert.equal(
       new Set([...first.items, ...second.items].map((p: { id: string }) => p.id)).size,
       4,
     )
     assert.equal(second.page.nextCursor, null)
-    assert.equal((await (await h.request('/api/v1/photos?q=%25')).json()).page.total, 1)
+    assert.equal((await (await h.request('/api/photos?q=%25')).json()).page.total, 1)
     for (const shape of ['landscape', 'portrait', 'square', 'panorama'])
       assert.equal(
-        (await (await h.request(`/api/v1/photos?orientation=${shape}`)).json()).page.total,
+        (await (await h.request(`/api/photos?orientation=${shape}`)).json()).page.total,
         1,
       )
     assert.equal(
-      (await h.request(`/api/v1/photos?tag=changed&cursor=${first.page.nextCursor}`)).status,
+      (await h.request(`/api/photos?tag=changed&cursor=${first.page.nextCursor}`)).status,
       400,
     )
     const detail = await (
-      await h.request(`/api/v1/photos/${a.id}?tag=${encodeURIComponent('海')}`)
+      await h.request(`/api/photos/${a.id}?tag=${encodeURIComponent('海')}`)
     ).json()
     assert.deepEqual(detail.neighbors, { previous: null, next: null })
-    assert.equal((await h.request('/api/v1/photos?limit=100000')).status, 400)
+    assert.equal((await h.request('/api/photos?limit=100000')).status, 400)
   } finally {
     await h.close()
   }
@@ -248,11 +246,10 @@ test('album management, edit, batch visibility, recycle bin, purge and media cac
   const h = await harness()
   try {
     await h.login()
-    const album = (
-      await (await h.request('/api/v1/admin/albums', 'POST', { title: '旅行' })).json()
-    ).album
+    const album = (await (await h.request('/api/admin/albums', 'POST', { title: '旅行' })).json())
+      .album
     const photo = (await h.upload(await fixture(), { albumIds: [album.id], tags: ['old'] })).photo
-    assert.equal((await (await h.request('/api/v1/albums')).json()).items[0].count, 1)
+    assert.equal((await (await h.request('/api/albums')).json()).items[0].count, 1)
     const media = await h.request(photo.assets.sm.url, 'GET', undefined, false)
     assert.equal(media.status, 200)
     assert.match(media.headers.get('cache-control')!, /private/)
@@ -271,28 +268,22 @@ test('album management, edit, batch visibility, recycle bin, purge and media cac
       isPublic: false,
       favorite: true,
     }
-    assert.equal((await h.request(`/api/v1/admin/photos/${photo.id}`, 'PATCH', edit)).status, 200)
+    assert.equal((await h.request(`/api/admin/photos/${photo.id}`, 'PATCH', edit)).status, 200)
     assert.equal(
       (await h.request(photo.assets.sm.url, 'GET', undefined, false, { 'if-none-match': etag }))
         .status,
       404,
     )
     assert.equal((await h.request(photo.assets.sm.url)).status, 200)
-    assert.equal(
-      (await h.request(`/api/v1/admin/photos/${photo.id}/permanent`, 'DELETE')).status,
-      409,
-    )
-    await h.request(`/api/v1/admin/photos/${photo.id}`, 'DELETE')
-    assert.equal((await (await h.request('/api/v1/admin/stats')).json()).trash, 1)
-    await h.request('/api/v1/admin/photos/actions', 'POST', { ids: [photo.id], action: 'restore' })
-    assert.equal((await (await h.request('/api/v1/admin/stats')).json()).trash, 0)
-    await h.request(`/api/v1/admin/photos/${photo.id}`, 'DELETE')
-    assert.equal(
-      (await h.request(`/api/v1/admin/photos/${photo.id}/permanent`, 'DELETE')).status,
-      200,
-    )
+    assert.equal((await h.request(`/api/admin/photos/${photo.id}/permanent`, 'DELETE')).status, 409)
+    await h.request(`/api/admin/photos/${photo.id}`, 'DELETE')
+    assert.equal((await (await h.request('/api/admin/stats')).json()).trash, 1)
+    await h.request('/api/admin/photos/actions', 'POST', { ids: [photo.id], action: 'restore' })
+    assert.equal((await (await h.request('/api/admin/stats')).json()).trash, 0)
+    await h.request(`/api/admin/photos/${photo.id}`, 'DELETE')
+    assert.equal((await h.request(`/api/admin/photos/${photo.id}/permanent`, 'DELETE')).status, 200)
     assert.equal(h.db.get<{ n: number }>('SELECT count(*) n FROM assets')!.n, 0)
-    assert.equal((await h.request(`/api/v1/admin/albums/${album.id}`, 'DELETE')).status, 200)
+    assert.equal((await h.request(`/api/admin/albums/${album.id}`, 'DELETE')).status, 200)
   } finally {
     await h.close()
   }
@@ -303,12 +294,12 @@ test('location privacy and downloads policy; stripping location never archives a
     await h.login()
     const p = (await h.upload(await fixture(), { location: 'SECRET_PLACE' })).photo
     h.settings.save({ ...h.settings.get(), showLocation: false, allowDownloads: false })
-    const detail = await (await h.request(`/api/v1/photos/${p.id}`, 'GET', undefined, false)).json()
+    const detail = await (await h.request(`/api/photos/${p.id}`, 'GET', undefined, false)).json()
     assert.equal(detail.photo.location, '')
     assert.equal(detail.photo.latitude, null)
-    assert.equal((await (await h.request('/api/v1/photos?q=SECRET_PLACE')).json()).page.total, 0)
+    assert.equal((await (await h.request('/api/photos?q=SECRET_PLACE')).json()).page.total, 0)
     assert.equal(
-      (await h.request(`/api/v1/photos/${p.id}/download`, 'GET', undefined, false)).status,
+      (await h.request(`/api/photos/${p.id}/download`, 'GET', undefined, false)).status,
       403,
     )
     const stripped = (
@@ -326,25 +317,20 @@ test('malformed files, forged client metadata, bad albums and storage failures d
   try {
     await h.login()
     assert.equal(
-      (await h.request('/api/v1/admin/uploads', 'POST', h.form(new TextEncoder().encode('<svg/>'))))
+      (await h.request('/api/admin/uploads', 'POST', h.form(new TextEncoder().encode('<svg/>'))))
         .status,
       415,
     )
     const bytes = await fixture()
     assert.equal(
-      (
-        await h.request(
-          '/api/v1/admin/uploads',
-          'POST',
-          h.form(bytes, { exif: { model: 'forged' } }),
-        )
-      ).status,
+      (await h.request('/api/admin/uploads', 'POST', h.form(bytes, { exif: { model: 'forged' } })))
+        .status,
       400,
     )
     assert.equal(
       (
         await h.request(
-          '/api/v1/admin/uploads',
+          '/api/admin/uploads',
           'POST',
           h.form(bytes, { albumIds: [crypto.randomUUID()] }),
         )
@@ -357,7 +343,7 @@ test('malformed files, forged client metadata, bad albums and storage failures d
       if (++count > 2) throw new Error('synthetic disk failure')
       return put(key, data)
     }
-    assert.equal((await h.request('/api/v1/admin/uploads', 'POST', h.form(bytes))).status, 500)
+    assert.equal((await h.request('/api/admin/uploads', 'POST', h.form(bytes))).status, 500)
     assert.equal(h.db.get<{ n: number }>('SELECT count(*) n FROM photos')!.n, 0)
     assert.deepEqual(await readdir(resolve(h.directory, 'media')), [])
   } finally {
@@ -376,14 +362,14 @@ test('namespaced processing modules persist private extension data without publi
   try {
     await h.login()
     const photo = (await h.upload(await fixture())).photo
-    const admin = await (await h.request(`/api/v1/admin/photos/${photo.id}`)).json()
+    const admin = await (await h.request(`/api/admin/photos/${photo.id}`)).json()
     assert.equal(
       admin.extensions.find((item: { namespace: string }) => item.namespace === 'test.annotation')
         .data.privateNote,
       'internal-only',
     )
     assert.doesNotMatch(
-      await (await h.request(`/api/v1/photos/${photo.id}`, 'GET', undefined, false)).text(),
+      await (await h.request(`/api/photos/${photo.id}`, 'GET', undefined, false)).text(),
       /internal-only/,
     )
   } finally {

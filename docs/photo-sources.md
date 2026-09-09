@@ -1,4 +1,4 @@
-# 测试照片来源
+# 照片来源与许可
 
 从 Wikimedia Commons 下载的真实摄影原片，不是生成图片。原文件不改变字节，manifest.json 记录每份 SHA256；网页按原许可署名并链接来源。
 
@@ -78,4 +78,4 @@
 | [Desierto de Lut, Irán, 2016-09-22, DD 44-49 HDR PAN](https://commons.wikimedia.org/wiki/File:Desierto_de_Lut,_Ir%C3%A1n,_2016-09-22,_DD_44-49_HDR_PAN.jpg)                                                                                                                             | Diego Delso                                      | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0)  | 9175 × 2105  | panorama  |
 
 共 70 张。原片总量 671.6 MiB。
-完整证据：docs/photo-manifest.json（70 份 SHA256 / 来源 / 许可 / EXIF 类型清单）；服务端处理复核：ten 服务器 workspace/artifacts/photo-audit/report.json。
+完整证据见 docs/photo-manifest.json（70 份 SHA256 / 来源 / 许可 / EXIF 类型清单）。

@@ -324,7 +324,7 @@ export default function PhotoDialog({ onReady }: { onReady?: () => void } = {}) 
       {site.data?.site.allowDownloads && summary && (
         <a
           className="button button--solid detail-download"
-          href={`/api/v1/photos/${summary.id}/download`}
+          href={`/api/photos/${summary.id}/download`}
         >
           <Icon name="download" size={18} />
           下载图片

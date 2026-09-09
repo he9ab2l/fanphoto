@@ -21,7 +21,7 @@ export class AuthService {
     readonly db: Database,
     readonly config: Config,
   ) {
-    this.cookie = config.origin.startsWith('https:') ? '__Host-fanphoto-v2' : 'fanphoto_v2'
+    this.cookie = config.origin.startsWith('https:') ? '__Host-fanphoto' : 'fanphoto'
   }
   checkOrigin(c: Context<HttpEnv>) {
     const origin = c.req.header('origin')

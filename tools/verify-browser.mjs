@@ -18,7 +18,7 @@ const browser = await chromium.connectOverCDP(endpoint)
 const output = resolve('artifacts/viewer')
 const reportFile = `${output}/${mobileOnly ? 'mobile-report' : 'browser-report'}.json`
 await mkdir(output, { recursive: true })
-const response = await fetch(`${origin}/api/v1/photos?limit=80`)
+const response = await fetch(`${origin}/api/photos?limit=80`)
 assert.ok(response.ok)
 const { items } = await response.json()
 const cases = [

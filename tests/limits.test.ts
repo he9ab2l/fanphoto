@@ -42,9 +42,7 @@ test('unknown timezone stays unknown in public API and full-size media honors do
       .withExif({ IFD0: { Make: 'Test only' }, IFD2: { DateTimeOriginal: '2024:01:02 03:04:05' } })
       .toBuffer()
     const photo = (await h.upload(bytes)).photo
-    const data = await (
-      await h.request(`/api/v1/photos/${photo.id}`, 'GET', undefined, false)
-    ).json()
+    const data = await (await h.request(`/api/photos/${photo.id}`, 'GET', undefined, false)).json()
     assert.equal(data.photo.capturedAt, null)
     assert.equal(data.photo.capturedOffset, null)
     assert.equal(data.photo.capturedLocal, '2024-01-02T03:04:05')

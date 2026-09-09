@@ -40,10 +40,7 @@ export function PhotoEditor({ photo, onClose }: { photo: Photo; onClose: () => v
               <span>{formatBytes(photo.file.bytes)}</span>
             </p>
             {photo.file.originalAvailable && (
-              <a
-                className="button button--outline"
-                href={`/api/v1/admin/photos/${photo.id}/source`}
-              >
+              <a className="button button--outline" href={`/api/admin/photos/${photo.id}/source`}>
                 <Icon name="download" size={17} />
                 下载原文件
               </a>

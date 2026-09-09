@@ -1,7 +1,6 @@
-# 架构与扩展设计
+# 架构设计
 
-本版按全新项目开发，不迁移旧数据库，不提供旧 API / UI 兼容层。
-程序版本为 2.0.0；新 HTTP 契约从 `/api/v1` 开始。
+FanPhoto 是一个自托管的照片墙应用，HTTP 契约从 `/api` 开始，分为公开、认证与管理三类。
 
 ## 总体结构
 
@@ -10,7 +9,7 @@ React 浏览器
   ├─ gallery：自然比例平铺 / 无限环绕 / 背景详情
   ├─ studio：认证 / 图库 / 上传 / 编辑 / 相册 / 设置
   └─ ui：Base UI + MingCute + 共享主题
-           │ 同源 /api/v1 与 /media/photos
+           │ 同源 /api 与 /media/photos
            ▼
 Caddy HTTPS → Hono HTTP 装配
   ├─ AuthService       会话、CSRF、同源验证与登录限速
@@ -26,7 +25,7 @@ Caddy HTTPS → Hono HTTP 装配
 ```
 
 `apps/server/src/app.ts` 只负责 HTTP、安全响应头、校验和路由装配。处理、存储与数据库逻辑
-在服务层，CLI 导入复用同一 `IngestService`，不是单独写一套入库脚本。
+在服务层，CLI 导入复用同一 `IngestService`。
 
 ## 前端
 
@@ -34,7 +33,7 @@ Caddy HTTPS → Hono HTTP 装配
 - TanStack Query 管理服务端数据、取消旧查询、游标与更新失效；界面偏好独立存于 localStorage。
 - studio、详情动画、元数据样式、筛选表单、显示设置、通知按需加载；首屏不提前下载这些交互代码。
 - Base UI 负责按钮、弹层、选择、开关、滑块、复选框与焦点；不手写焦点陷阱。
-- React Bits Masonry / DomeGallery 的适配见 `vendor/NOTICE.md`；全站玻璃为自研 Glass Engine（`src/glass/`，见 `docs/glass-engine-architecture.md`），不再依赖 react-bits 玻璃组件。
+- React Bits Masonry / DomeGallery 的适配见 `vendor/NOTICE.md`；全站玻璃为自研 Glass Engine（`src/glass/`，见 `docs/glass-engine-architecture.md`）。
 - MingCute 是唯一图标体系；不请求远程图标 CDN，不手画图标。
 - 所有公开与管理页面共享黑白灰 token、系统字体、安全区、明 / 暗 / 系统主题和交互反馈。
 
@@ -84,7 +83,7 @@ Pointer / wheel 输入由成熟手势库管理，惯性与每帧 transform 在 r
 - 开启位置擦除时，坐标 / 地点为空且不保留可能包含 GPS 的原文件；仍保存清洁高清副本。
 - EXIF 严格白名单，不公开序列号 / MakerNote。未知值保持空，不编造镜头、ISO、地点或日期。
 - 没有时区的拍摄时间保留 `capturedLocal`，公开 `capturedAt` 为 null；
-  数据库仅用其本地时间的 UTC 数值作排序替代，绝不把它宣传成真实 UTC 拍摄时间。
+  数据库仅用其本地时间的 UTC 数值作排序替代，不把它宣传成真实 UTC 拍摄时间。
 - 内容 SHA256 去重，客户端 UUID 幂等键拒绝用于不同文件。磁盘写失败回滚，不出现半张图库记录。
 - 服务启动把中断的处理记录标为失败；重试重新检查源哈希，可安全恢复。
 
@@ -110,34 +109,35 @@ SQLite 开启 WAL、外键和 busy timeout；SQL 全部参数绑定。公开过�
 ## 安全与隐私边界
 
 - 管理员密码使用 scrypt；会话令牌仅保存 SHA256，HttpOnly + SameSite + HTTPS Secure Cookie。
-- 写操作要求会话、CSRF 和同源校验；错误登录按来源限速，凭据改变后旧会话自然失效。
+- 写操作要求会话、CSRF 和同源校验；错误登录按来源限速，凭据改变后会话自然失效。
 - 服务只绑定回环地址，由 Caddy 入口提供 HTTPS；只信任本机代理链的最后一段来源。
 - CSP、禁止嵌入、nosniff、明确 MIME、路径白名单；用户文件名不参与存储路径。
 - 原文件、数据库、密码、环境文件不放在 Web 静态目录，不允许通过 SPA fallback 读取。
 - API `no-store`；媒体 `private, no-cache`，避免撤回公开后仍被代理作为公开缓存提供。
 - “隐藏位置”作用于结构化字段及地点字段搜索，不自动改写标题 / 描述，也不能改变照片本身的地理线索。
 - 下载开关不是 DRM；访客已经看见的预览无法防止截图或另存。
-- 当前为测试环境，HTML 与响应都设置 noindex。
+- 响应默认带 noindex，站点不主动参与搜索引擎收录。
 
-## 扩展与未来兼容
+## 契约演进与扩展
 
-不是兼容旧项目，而是给这份新契约留出正常迭代路径：
+API 以向后兼容的方式演进：新增可选字段或新端点，不修改现有字段的含义与类型；
+破坏性变更需显式迁移，不做隐式版本猜测。
 
-1. `/api/v1` 只做加法兼容：新增可选字段 / 新端点，现有字段的意义和类型不改。
-   破坏性变化使用 `/api/v2`，不要按客户端版本隐式猜测。
-2. 增量 SQL 迁移按序、事务和校验和执行；不编辑已应用文件。
-3. `MediaModule` 接收照片 ID、清洁预览字节、源尺寸与只读 EXIF，返回限长的命名空间数据。
+其他演进原则：
+
+1. 增量 SQL 迁移按序、事务和校验和执行；不编辑已应用文件。
+2. `MediaModule` 接收照片 ID、清洁预览字节、源尺寸与只读 EXIF，返回限长的命名空间数据。
    例如 `ai.labels`、`camera.recipe`。模块由服务器代码显式注册，不执行上传的脚本。
-4. 扩展 JSON 默认不公开。新增公开功能必须定义自己的 schema / 权限 / 投影，
+3. 扩展 JSON 默认不公开。新增公开功能必须定义自己的 schema / 权限 / 投影，
    不能直接把整张 extensions 表透传给访客。
-5. 分享可新增 token_hash / 权限 / expires_at 表；评论可新增审核状态和索引；
+4. 分享可新增 token_hash / 权限 / expires_at 表；评论可新增审核状态和索引；
    AI 标签可写独立模型版本 / 置信度，再由显式操作加入人工标签，不覆盖来源事实。
-6. 对象存储替换只需实现 ObjectStore，图库不拼绝对磁盘路径。
+5. 对象存储替换只需实现 ObjectStore，图库不拼绝对磁盘路径。
    多进程大批量处理时可把 ingest 队列迁移为持久任务 worker，HTTP 契约与照片 ID 保持。
 
-目前没有虚假的评论、AI 标注或私有分享按钮；扩展位置真实存在，但未实现功能不冒充已上线。
+扩展位置真实存在，未实现的功能不冒充已上线。
 
-## 2026-09 加载优化
+## 性能设计
 
 - 请求内复用位置可见性投影；公开列表不读取 EXIF、分析和相册 JSON；管理列表不逐张查询原片可用性。
 - 媒体与下载使用资源/照片联表的轻量查询，公开校验先于 ETag，不缓存授权判断。

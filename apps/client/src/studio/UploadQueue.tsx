@@ -48,7 +48,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     busy.current = true
     const request = new XMLHttpRequest()
     active.current = request
-    request.open('POST', '/api/v1/admin/uploads')
+    request.open('POST', '/api/admin/uploads')
     request.withCredentials = true
     request.setRequestHeader('X-CSRF-Token', getCsrf())
     request.responseType = 'json'

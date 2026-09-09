@@ -77,7 +77,7 @@ export async function harness(modules?: MediaModule[]) {
     )
   }
   const login = async () => {
-    const response = await request('/api/v1/session', 'POST', { password: testPassword }, false)
+    const response = await request('/api/session', 'POST', { password: testPassword }, false)
     const session = await response.clone().json()
     cookie = response.headers.get('set-cookie')?.split(';')[0] || ''
     csrf = session.csrfToken
@@ -93,7 +93,7 @@ export async function harness(modules?: MediaModule[]) {
     return form
   }
   const upload = async (bytes: Uint8Array, options: Record<string, unknown> = {}) => {
-    const response = await request('/api/v1/admin/uploads', 'POST', form(bytes, options))
+    const response = await request('/api/admin/uploads', 'POST', form(bytes, options))
     if (!response.ok) throw new Error(await response.text())
     return response.json()
   }

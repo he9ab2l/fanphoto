@@ -1,10 +1,10 @@
-# FanPhoto Glass Engine
+# Glass Engine
 
 统一的玻璃引擎：材质、形状、环境色、动态光、折射渲染都由 `apps/client/src/glass/` 一处解析，
-组件不写玻璃参数。目标观感是 Apple 式的"真实玻璃"——边缘折射、内部干净、随环境微调，
-而不是网页常见的糊一层 blur。
+组件不写玻璃参数。目标是接近真实玻璃的观感——边缘折射、内部干净、随环境微调，而不是网页
+常见的糊一层 backdrop blur。
 
-## 1. 结构
+## 结构
 
 ```text
 GlassSurface.tsx      React 唯一入口：material / shape / tint / interactive /
@@ -37,7 +37,7 @@ renderers/
 样式只有一个文件：`styles/glass.css`。材质参数经 `materialVars()` 注入表面内联变量，
 `.material` 静态面板（popover/modal/studio 导航）读同一组 :root token。
 
-## 2. 渲染路径与降级
+## 渲染路径与降级
 
 ```text
 restricted（reduced-motion/transparency/contrast、saveData、≤2 核） → CSS 毛玻璃
@@ -46,21 +46,19 @@ Chromium + refractive + 预算内（≤1024×900 且 ≤280k px）             �
 桌面详情面板（webgl prop + 探测通过）                                → WebGL hero 透镜
 ```
 
-- 面积预算：dock、按钮、弹层、详情面板、移动 sheet 都能进入液态路径；
-  超预算的大表面保持毛玻璃。
+- 面积预算：dock、按钮、弹层、详情面板、移动 sheet 都能进入液态路径；超预算的大表面保持毛玻璃。
 - 位移/滤波失败（canvas 不可用、滤镜未生效）自动回到 frosted，功能不受影响。
 - WebGL 探测只在声明了 `webgl` prop 的表面上进行，模块按需加载。
 
-## 3. 光与高光
+## 光与高光
 
 - `GlassLight` 维护全局指针光（viewport 分数 + 活跃强度），空闲 220ms 后 rAF 停转。
-- 每个开启 specular 的表面订阅光状态，把 `--glass-spec-x/y/intensity` 直接写到
-  自己的元素上（`glass.css` 的 ::before radial-gradient 消费），指针移动不触发任何
-  React 重渲染。
-- Fresnel 内缘光环由 `glass.css` ::after 的 inset 光晕实现，强度跟随
-  `--glass-rim-strength`（材质定义），SVG/WebGL/CSS 三条路径共享同一 rim 语言。
+- 每个开启 specular 的表面订阅光状态，把 `--glass-spec-x/y/intensity` 直接写到自己的元素上
+  （`glass.css` 的 ::before radial-gradient 消费），指针移动不触发任何 React 重渲染。
+- Fresnel 内缘光环由 `glass.css` ::after 的 inset 光晕实现，强度跟随 `--glass-rim-strength`
+  （材质定义），SVG/WebGL/CSS 三条路径共享同一 rim 语言。
 
-## 4. 组件约定
+## 组件约定
 
 - 交互控制面（dock、导航按钮、详情角标、详情面板）→ `GlassSurface`，thin/regular/thick。
 - 静态面板（popover、modal、select、studio 卡片）→ `className="… material"`，读 token。
