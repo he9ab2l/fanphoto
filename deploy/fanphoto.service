@@ -1,5 +1,5 @@
 [Unit]
-Description=FanPhoto 2 photo library
+Description=FanPhoto photo library
 After=network.target
 ConditionPathExists=/home/ubuntu/fanphoto-next/current/apps/server/dist/server.mjs
 

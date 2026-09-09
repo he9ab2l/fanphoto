@@ -24,7 +24,7 @@ const server = serve(
       return app.fetch(request, { clientIp })
     },
   },
-  () => console.log(`FanPhoto 2 listening on ${config.host}:${config.port}`),
+  () => console.log(`FanPhoto listening on ${config.host}:${config.port}`),
 )
 if ('requestTimeout' in server) server.requestTimeout = 120_000
 if ('headersTimeout' in server) server.headersTimeout = 15_000
