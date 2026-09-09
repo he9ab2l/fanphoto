@@ -38,8 +38,8 @@ packages/contracts/  Zod 请求契约与 TypeScript 响应类型
 scripts/             初始化、原片导入、备份、构建打包
 deploy/              systemd 服务、原子发布、Caddy 配置替换
 tests/               API、媒体、几何、查看器、缓存、部署配置、限额测试
-tools/               照片下载、元数据审计、许可汇总、来源清单生成
-docs/                架构、API、玻璃引擎、照片来源
+tools/               依赖许可汇总、浏览器与域名验收
+docs/                架构、API、玻璃引擎
 ```
 
 ## 快速开始
@@ -86,20 +86,12 @@ bash deploy/release.sh            # install→build→test→备份→原子切�
 生产部署为不可变 release + `current` 符号链接原子切换，systemd `fanphoto.service` 托管，
 Caddy 反向代理并强制 HTTPS。
 
-## 示例图库
-
-`node tools/download-landscapes.mjs` 下载 Wikimedia Commons 开放许可的照片原片，保留原始字节
-与真实 EXIF，并记录作者、许可、来源、尺寸与 SHA256。当前清单 70 张（横 26 / 竖 14 / 方 12 /
-全景 18）。
-
 ## 文档
 
 - [架构设计](docs/ARCHITECTURE.md)
 - [API 契约](docs/API.md)
 - [玻璃引擎](docs/glass-engine-architecture.md)
-- [照片来源与许可](docs/photo-sources.md)
 
 ## License
 
-本项目未选择开源许可证（私有项目）。示例照片按各自作者许可署名（CC BY / CC BY-SA / CC0），
-见 [docs/photo-sources.md](docs/photo-sources.md)。
+本项目未选择开源许可证（私有项目）。

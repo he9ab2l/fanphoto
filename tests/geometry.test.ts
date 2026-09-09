@@ -1,6 +1,5 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import {
   masonry,
   project,
@@ -232,18 +231,21 @@ test('an isolated portrait between panoramas stays readable without becoming a g
   assert.ok(portrait.x > 0, 'bounded, centered exception when neighbors cannot share a healthy row')
 })
 
-const manifest = JSON.parse(
-  readFileSync(new URL('../docs/photo-manifest.json', import.meta.url), 'utf8'),
-) as { photos: { width: number; height: number }[] }
-const realPhotos = makePhotos(manifest.photos.map((photo) => photo.width / photo.height))
+const galleryRatios = [
+  ...Array(26).fill(1.5),
+  ...Array(14).fill(0.66),
+  ...Array(12).fill(1),
+  ...Array(18).fill(2.6),
+]
+const galleryPhotos = makePhotos(galleryRatios)
 
-test('real gallery has balanced visible areas at all required widths and densities', () => {
+test('gallery has balanced visible areas at all required widths and densities', () => {
   for (const width of [360, 390, 430, 768, 1024, 1280, 1440])
     for (const density of [1, 2, 3]) {
-      const { tiles } = masonry(realPhotos, width, density)
+      const { tiles } = masonry(galleryPhotos, width, density)
       assert.deepEqual(
         tiles.map((tile) => tile.photo.id),
-        realPhotos.map((photo) => photo.id),
+        galleryPhotos.map((photo) => photo.id),
       )
       const areas = tiles.map((tile) => tile.width * tile.height).sort((a, b) => a - b)
       const spread = areas.at(-1)! / areas[0]
@@ -260,10 +262,10 @@ test('real gallery has balanced visible areas at all required widths and densiti
 
 test('pagination preserves committed rows and emits every new photo once', () => {
   for (const width of [390, 768, 1440]) {
-    let source = realPhotos.slice(0, 24)
+    let source = galleryPhotos.slice(0, 24)
     let layout = masonry(source, width)
     for (const end of [48, 70]) {
-      const next = realPhotos.slice(0, end)
+      const next = galleryPhotos.slice(0, end)
       const rows = [...new Set(layout.tiles.map((tile) => tile.y))]
       const frozen = layout.tiles.filter((tile) => tile.y < rows.at(-2)!)
       const updated = appendMasonry(layout, source, next, width)
@@ -292,7 +294,7 @@ test('surround density matches the flat wall: same gaps, portraits fill columns'
   for (const width of [390, 768, 1440])
     for (const density of [1, 2, 3]) {
       const size = { width, height: Math.round(width * 0.625) }
-      const tiles = sceneTiles(realPhotos, size, { x: width / 2, y: size.height / 2 }, density)
+      const tiles = sceneTiles(galleryPhotos, size, { x: width / 2, y: size.height / 2 }, density)
       const gap = density === 3 ? 6 : 10
       assert.equal(gap, DEFAULT_JUSTIFY_OPTIONS[density].gap, 'gap schedule mirrors flat mode')
       const cell = width / columnCount(width, density)
@@ -322,7 +324,7 @@ test('surround density matches the flat wall: same gaps, portraits fill columns'
           )
         }
       }
-      const flat = masonry(realPhotos, width, density)
+      const flat = masonry(galleryPhotos, width, density)
       if (width >= 600) {
         // Column layout caps panoramas at column width while flat rows scale
         // them to full wall width; portraits already match flat density, so
