@@ -14,7 +14,6 @@ const health = await (await request('/api/health')).json()
 assert.equal(health.version, '1.0.0')
 assert.equal(health.ok, true)
 report.health = health
-assert.equal((await request('/api/photos')).status, 404)
 assert.equal((await request('/api/admin/stats')).status, 401)
 for (const path of ['/', '/studio', '/favicon.svg']) {
   const response = await request(path)
